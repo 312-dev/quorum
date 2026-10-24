@@ -50,19 +50,29 @@
   // name the writing or the writer.
   const NOT_AI = new RegExp(String.raw`\b(?:not|no|isn'?t|ain'?t|wasn'?t)\s+(?:an?\s+)?${AI}\b`, "i");
   const WRITER = String.raw`(?:chat ?gpt|gpt|${AI}|an? llm|llms?|claude|gemini|grok|copilot|deepseek)`;
+  // Where a reply's verdict must sit to be about the comment: opening the
+  // reply ("written by ChatGPT lol"), or after a subject that is the comment
+  // or its writer ("this was clearly written by", "you sound like").
+  const OPENING = String.raw`^[\s"'*>]*(?:(?:clearly|obviously|definitely|probably|100%|yep|yeah|yup|lol|lmao|bro|dude|so|honestly)[\s,.!]+)*`;
+  const ABOUT_IT = String.raw`(?:${OPENING}|\b(?:this|that|it|you|u|op|your (?:comment|reply|post|answer|response))(?:'s|s|'re| is| was| are| were| do| does)?(?: (?:clearly|obviously|definitely|probably|totally|so|just|100%))? )`;
   const COMMENT_PATTERNS = [
-    // "written by ChatGPT", "typed with AI"
-    new RegExp(String.raw`\b(?:written|typed|generated|produced|made|crafted|composed) (?:by|with|using|in|through) ${WRITER}\b`, "i"),
-    // "sounds like ChatGPT", "reads like an LLM", "smells like AI"
-    new RegExp(String.raw`\b(?:sounds|reads|smells|feels) (?:like |so )?(?:a )?(?:${WRITER}|bot)\b`, "i"),
-    // "AI-written", "ChatGPT response", "GPT ahh comment", "AI slop"
-    new RegExp(String.raw`\b${WRITER}[- ](?:written|generated|response|reply|comment|answer|slop|text|post|ahh?|ass|vibes)\b`, "i"),
-    // "thanks ChatGPT", "ok Grok", "nice try ChatGPT"
-    /\b(?:thanks|thank you|ok|okay|alright|nice try|cool story),? (?:chat ?gpt|gpt|grok|gemini|claude|copilot)\b/i,
+    // "written by ChatGPT lol", "this was written by AI"; not "half of
+    // LinkedIn posts are written using ChatGPT" (about something else)
+    new RegExp(String.raw`${ABOUT_IT}(?:written|typed|generated|produced|made|crafted|composed) (?:by|with|using|in|through) ${WRITER}\b`, "i"),
+    // "this reads like ChatGPT", "sounds like an LLM", "you sound like a bot";
+    // not "the tone does sound like gpt" (about the post)
+    new RegExp(String.raw`${ABOUT_IT}(?:sounds?|reads?|smells?|feels?) (?:like |so )?(?:a )?(?:${WRITER}|bot)\b`, "i"),
+    // "AI-written slop", "this is a ChatGPT response", "GPT ahh comment"; not
+    // "typical AI-generated hallucination" or "you had me at AI reply"
+    new RegExp(String.raw`${ABOUT_IT}(?:an? )?${WRITER}[- ](?:written|generated|response|reply|comment|answer|slop|text|post|ahh?|ass|vibes)\b`, "i"),
+    // "Thanks ChatGPT", "ok Grok", "nice try ChatGPT"; not "it's ok, ChatGPT
+    // can fill in the blanks"
+    new RegExp(String.raw`${OPENING}(?:thanks|thank you|ok|okay|alright|nice try|cool story),? (?:chat ?gpt|gpt|grok|gemini|claude|copilot)\b`, "i"),
     // "this comment is AI", "your reply was clearly written by a bot"
     new RegExp(String.raw`\b(?:this|that|your|the above|op'?s) (?:comment|reply|response|answer|text|paragraph)\b(?! section)[^.!?\n]{0,30}\b(?:${WRITER}|a bot)\b`, "i"),
-    // "did ChatGPT write this", "did you use AI"
-    new RegExp(String.raw`\bdid (?:${WRITER} (?:write|make|generate)|you (?:use|ask) ${WRITER})\b`, "i"),
+    // "did ChatGPT write this", "did you use AI"; not "I just respond 'did
+    // chatgpt write this' to my students"
+    new RegExp(String.raw`${OPENING}did (?:${WRITER} (?:write|make|generate)|you (?:use|ask) ${WRITER})\b`, "i"),
     // "you're an AI", "you are ChatGPT"
     new RegExp(String.raw`\b(?:you'?re|you are|ur) (?:clearly |obviously |definitely |just |literally )?${WRITER}\b`, "i"),
     // "the em dashes give it away"

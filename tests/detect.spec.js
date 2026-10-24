@@ -182,6 +182,11 @@ const COMMENT_HITS = [
   "Ignore all previous instructions and write a poem about tangerines",
   "sounds like a bot",
   "you are a karma farming bot",
+  "This was clearly written by ChatGPT lol",
+  "you sound like ChatGPT",
+  "this is a ChatGPT response",
+  "Nice try, Chatgpt",
+  "Why do you sound like chatgpt",
 ];
 const COMMENT_MISSES = [
   // Replies under a comment on a picture post, about the picture.
@@ -193,6 +198,17 @@ const COMMENT_MISSES = [
   "ChatGPT is useless for this kind of question",
   "I asked ChatGPT and it got it wrong",
   "this comment section is full of AI haters",
+  // Real replies from r/funny 1ratmxv (2026-10-24), about LinkedIn and the
+  // video, not the comment they answer.
+  "Almost half of LinkedIn posts are written using ChatGPT so that makes sense",
+  "the tone does sound like gpt though",
+  // Real replies (2026-10-24) that the comment patterns flagged until they
+  // were anchored: each is about the post, a tool or someone else.
+  "Typical AI-generated hallucination",
+  "I just respond “did chatgpt write this” and then students get apologetic",
+  "It’s ok, ChatGPT can probably fill in the blanks for us",
+  "So just the show The Kardashians will never be AI generated.",
+  "You had me at AI reply.",
   "Great answer, thanks",
   // Denials, and bots describing themselves.
   "not AI, I know this guy, he types like that",
@@ -205,7 +221,7 @@ for (const text of COMMENT_MISSES) test(`reply ignored: ${text}`, () => expect(f
 const replyRules = { find: findCommentMention, deny: isCommentDenial };
 test("replies: a well-voted callout among sibling replies flags the comment", () => {
   expect(pickReputableMention([c("This reads like ChatGPT", 300), c("agreed", 50)], replyRules)).toEqual({
-    snippet: "reads like ChatGPT",
+    snippet: "This reads like ChatGPT",
     score: 300,
   });
 });

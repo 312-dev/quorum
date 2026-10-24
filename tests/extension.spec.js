@@ -473,7 +473,7 @@ test("hides comments that replies call out as AI-written, with Reddit's spoiler 
   const meta = comment(page, "c1").locator("[slot=commentMeta]").first();
   const badge = meta.locator(".author-hovercard-trigger + .rab-badge");
   await expect(badge).toHaveText("Potential AI");
-  await expect(badge).toHaveAttribute("title", /\(\+300\) "reads like ChatGPT"/);
+  await expect(badge).toHaveAttribute("title", /\(\+300\) "This reads like ChatGPT"/);
   await expect(page.locator(".rab-badge")).toHaveCount(2);
 
   // Each paragraph gets its own spoiler; the replies stay readable.
