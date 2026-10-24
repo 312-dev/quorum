@@ -1,0 +1,38 @@
+/* Fallback blur for pages without Reddit's <shreddit-blurred-container> (old
+   Reddit). Values are the component's computed styles as measured on
+   www.reddit.com on 2026-10-23: 40px blur over an rgba(0,0,0,.8) fill, a .6
+   scrim, 16px corners, and the "media" pill button. */
+.rab-flagged {
+  position: relative !important;
+  overflow: hidden !important;
+  border-radius: 16px;
+}
+
+.rab-flagged > :not(.rab-overlay) {
+  filter: blur(40px);
+  background: rgba(0, 0, 0, 0.8);
+  pointer-events: none !important;
+  user-select: none;
+}
+
+.rab-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.rab-pill {
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.098);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: 600 12px/30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  cursor: pointer;
+}

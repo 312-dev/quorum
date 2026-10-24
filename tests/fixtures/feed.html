@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>r/test fixture</title>
+<style>
+  body { margin: 0; font-family: sans-serif; background: #fff; }
+  article { display: block; width: 640px; margin: 0 auto 24px; }
+  shreddit-post, .loose { display: block; height: 520px; padding: 12px; box-sizing: border-box;
+    background: linear-gradient(135deg, #ff4500, #7a2cff); color: #fff; }
+  .loose-host { width: 640px; margin: 0 auto 24px; }
+  .media-box { border: 1px solid #333d42; border-radius: 16px; overflow: hidden; height: 300px; }
+</style></head>
+<body>
+<main id="feed">
+  <article><shreddit-post id="t3_ai1" comment-count="12" permalink="/r/test/comments/ai1/x/"><a slot="title" href="/r/test/comments/ai1/x/">Look at this sunset</a><div slot="post-media-container" class="media-box"><div class="media">sunset.jpg</div></div></shreddit-post></article>
+  <article><shreddit-post id="t3_clean1" comment-count="8" permalink="/r/test/comments/clean1/x/"><a slot="title" href="/r/test/comments/clean1/x/">My cat</a></shreddit-post></article>
+  <article><shreddit-post id="t3_zero" comment-count="0" permalink="/r/test/comments/zero/x/"><a slot="title">No comments yet</a></shreddit-post></article>
+  <div class="loose-host"><shreddit-post id="t3_loose" comment-count="3" permalink="/r/test/comments/loose/x/"><a slot="title">Post with no article wrapper</a></shreddit-post></div>
+  <article><shreddit-post id="t3_lowvote" comment-count="3" permalink="/r/test/comments/lowvote/x/"><a slot="title">Mountain lake</a></shreddit-post></article>
+  <article><shreddit-post id="t3_controversial" comment-count="3" permalink="/r/test/comments/controversial/x/"><a slot="title">Hot take art</a></shreddit-post></article>
+  <article><shreddit-post id="t3_text1" comment-count="2" permalink="/r/test/comments/text1/x/"><a slot="title">My poem</a><shreddit-post-text-body slot="text-body"><div slot="text-body"><p>Roses are red</p></div></shreddit-post-text-body></shreddit-post></article>
+  <article><shreddit-post id="t3_farmed" author="New_Farmer1234" comment-count="2" permalink="/r/test/comments/farmed/x/"><a slot="title">Cute dog</a></shreddit-post></article>
+  <article><shreddit-post id="t3_veteran" author="OldTimer" comment-count="2" permalink="/r/test/comments/veteran/x/"><a slot="title">Cute cat</a></shreddit-post></article>
+  <div style="height: 4000px"></div>
+  <article><shreddit-post id="t3_far" comment-count="40" permalink="/r/test/comments/far/x/"><a slot="title">Far below the fold</a></shreddit-post></article>
+</main>
+</body>
+</html>
