@@ -97,6 +97,13 @@ closed, the toggle Reddit's own collapse button flips, so the badge stays visibl
 row. Old Reddit gets its native `.flair` for the badge and a spoiler bar drawn by `content.css` with
 the component's measured values (`#131313`, 2px corners).
 
+## Icon
+
+`extension/icons/icon.svg` is the source: a question mark in Reddit's two vote colours, the
+orange half curling up into an upvote, the periwinkle half running down into a downvote, with the
+AI sparkle as its dot. `node dev/export-icons.mjs` renders the 16, 32, 48 and 128 px PNGs the
+manifest uses (the 128 px one with the 16 px padding the Chrome Web Store asks for).
+
 ## Tests
 
 ```sh

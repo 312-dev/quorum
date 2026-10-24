@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- A question mark drawn from Reddit's two vote colours: the upvote-orange
+       half curls into the bowl and ends in an up arrow, the downvote-periwinkle
+       half runs down into a down arrow, and the dot is the AI sparkle.
+       PNGs are rendered from this file by dev/export-icons.mjs. -->
+  <defs>
+    <path id="sparkle" d="M0 -1 Q.2 -.2 1 0 Q.2 .2 0 1 Q-.2 .2 -1 0 Q-.2 -.2 0 -1 Z"/>
+    <!-- The tail cuts a real gap out of the orange hook, so it stays clear on
+         any toolbar colour. -->
+    <mask id="tail-cut" maskUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="250">
+      <rect x="-50" y="-50" width="200" height="250" fill="#fff"/>
+      <path d="M78 34 C78 48 50 48 50 62 V70" fill="none" stroke="#000" stroke-width="28"/>
+    </mask>
+  </defs>
+  <!-- Drawn on a 100-unit grid, then fitted and centred in the square. -->
+  <g transform="translate(8.82 2.65) scale(0.8235)">
+    <g mask="url(#tail-cut)">
+      <path d="M50 6 A28 28 0 0 0 22 34 V38 A14 14 0 0 0 50 38 V31" fill="none" stroke="#ff4500" stroke-width="16"/>
+      <path d="M36 33 H64 L50 18 Z" fill="#ff4500"/>
+    </g>
+    <path d="M50 6 A28 28 0 0 1 78 34 C78 48 50 48 50 62 V70" fill="none" stroke="#7193ff" stroke-width="16"/>
+    <path d="M26 65 H74 L50 89 Z" fill="#7193ff"/>
+    <use href="#sparkle" fill="#7193ff" transform="translate(50 103) scale(14)"/>
+  </g>
+</svg>
