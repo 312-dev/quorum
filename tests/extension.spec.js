@@ -66,8 +66,12 @@ async function launch(extDir) {
   // Tests flip these: blockJson answers the JSON API with 403 as Reddit does
   // for suspected bots; fakeScores serves every partial comment at score 1, as
   // the partial does while comment scores are hidden; redditBlur defines a
-  // stand-in for Reddit's blur component on the page.
-  const ext = { context, fetched: [], partials: [], hoverCards: [], blockJson: false, fakeScores: false, redditBlur: false };
+  // stand-in for Reddit's blur component on the page, redditSpoiler one for
+  // its spoiler.
+  const ext = {
+    context, fetched: [], partials: [], hoverCards: [],
+    blockJson: false, fakeScores: false, redditBlur: false, redditSpoiler: false,
+  };
   // Chromium can still be writing into the profile as close() resolves, so a
   // plain delete races it (ENOTEMPTY); rmSync's retries cover that.
   ext.close = async () => {
@@ -92,11 +96,16 @@ async function launch(extDir) {
       ext.partials.push(partial[1]);
       return route.fulfill({ contentType: "text/html", body: partialHtml(partial[1], ext.fakeScores) });
     }
-    const page = url.hostname.startsWith("old.") ? "old.html" : url.pathname.includes("/comments/") ? "post.html" : "feed.html";
-    let body = readFileSync(join(FIXTURES, page), "utf8");
-    if (ext.redditBlur) {
-      const mock = readFileSync(join(FIXTURES, "mock-blurred-container.js"), "utf8");
-      body = body.replace("</head>", `<script>${mock}</script></head>`);
+    const old = url.hostname.startsWith("old.");
+    let body;
+    if (url.pathname.includes("/comments/thread1/")) body = (old ? oldThreadHtml : threadHtml)(THREAD);
+    else {
+      const page = old ? "old.html" : url.pathname.includes("/comments/") ? "post.html" : "feed.html";
+      body = readFileSync(join(FIXTURES, page), "utf8");
+    }
+    const mocks = [ext.redditBlur && "mock-blurred-container.js", ext.redditSpoiler && "mock-spoiler.js"].filter(Boolean);
+    for (const mock of mocks) {
+      body = body.replace("</head>", `<script>${readFileSync(join(FIXTURES, mock), "utf8")}</script></head>`);
     }
     return route.fulfill({ contentType: "text/html", body });
   });
@@ -127,6 +136,47 @@ function partialHtml(id, fakeScores) {
     `<shreddit-comment score="${fakeScores ? 1 : score}"><div slot="comment"><p>${body}</p></div>${replies.map(render).join("")}</shreddit-comment>`;
   const [first, ...rest] = (COMMENTS[id] || []).map(render);
   return `<script>document.title = "partial script ran"</script><shreddit-comment-tree>${first || ""}</shreddit-comment-tree><section aria-label="Comments"><template>${rest.join("")}</template></section>`;
+}
+
+// A comment thread: [id, score, body html, replies]. c1's replies call it out
+// as ChatGPT-written; c2's reply asks about the picture, not the comment; c3's
+// callout is under the vote floor; c4's is outvoted by a denial; c5 is
+// called a bot.
+const THREAD = [
+  ["c1", 900, "<p>Great question. There are three reasons.</p><p>First, see <a href='https://example.com/x'>this link</a>.</p>", [
+    ["r1", 300, "<p>This reads like ChatGPT</p>"],
+    ["r2", 50, "<p>agreed</p>"],
+  ]],
+  ["c2", 400, "<p>My dog does this too</p>", [["r3", 200, "<p>is this AI?</p>"]]],
+  ["c3", 400, "<p>Totally normal comment</p>", [["r4", 3, "<p>written by ChatGPT lol</p>"], ["r5", 10, "<p>nice</p>"]]],
+  ["c4", 300, "<p>I was there</p>", [["r6", 60, "<p>you're a bot</p>"], ["r7", 80, "<p>Not a bot, I know him</p>"]]],
+  ["c5", 200, "<p>Upvote if you agree</p>", [["r8", 40, "<p>you are a karma farming bot</p>"]]],
+];
+
+// New Reddit's comment markup, reduced to what the extension reads: the
+// comment's attributes, its meta row with the author, and its body in a
+// slot="comment" div, with replies nested inside its <details>.
+function threadHtml(thread) {
+  const render = ([id, score, body, replies = []], parent) => `
+    <shreddit-comment thingid="t1_${id}" ${parent ? `parentid="t1_${parent}"` : ""} author="user_${id}" score="${score}">
+      <details open><summary><div slot="commentMeta"><span class="author-hovercard-trigger"><div class="author-name-meta"><a class="author">user_${id}</a></div></span><span> • 1h ago</span></div></summary>
+      <div slot="comment">${body}</div>
+      ${replies.map((r) => render(r, id)).join("")}
+      </details>
+    </shreddit-comment>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>thread fixture</title></head><body><main>${thread.map((c) => render(c)).join("")}</main></body></html>`;
+}
+
+// Old Reddit's: nested .thing.comment, the score's number in the title of
+// .score.unvoted, the body in .usertext-body .md, replies under .child.
+function oldThreadHtml(thread) {
+  const render = ([id, score, body, replies = []]) => `
+    <div class="thing comment noncollapsed" data-fullname="t1_${id}">
+      <div class="entry"><p class="tagline"><a class="author">user_${id}</a> <span class="score unvoted" title="${score}">${score} points</span></p>
+      <form class="usertext"><div class="usertext-body"><div class="md">${body}</div></div></form></div>
+      <div class="child"><div class="sitetable listing">${replies.map(render).join("")}</div></div>
+    </div>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>old thread fixture</title><style>.collapsed > .child, .collapsed .usertext { display: none }</style></head><body><div class="commentarea"><div class="sitetable nestedlisting">${thread.map(render).join("")}</div></div></body></html>`;
 }
 
 const test = base.extend({
@@ -397,4 +447,134 @@ test("hot reload: editing a file reloads the extension and open Reddit tabs", as
     server.kill();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+const comment = (page, id) => page.locator(`[thingid="t1_${id}"], [data-fullname="t1_${id}"]`).first();
+const commentState = (page, id) => comment(page, id).getAttribute("data-rab-comment");
+
+// The popup, opened as a page of the extension.
+async function openPopup(ext) {
+  const id = ext.context.serviceWorkers()[0].url().split("/")[2];
+  const popup = await ext.context.newPage();
+  await popup.goto(`chrome-extension://${id}/popup.html`);
+  await expect(popup.locator("#stats")).toContainText("checked");
+  return popup;
+}
+
+test("hides comments that replies call out as AI-written, with Reddit's spoiler and a badge", async ({ ext }) => {
+  ext.redditSpoiler = true;
+  const page = await ext.context.newPage();
+  await page.goto("https://www.reddit.com/r/test/comments/thread1/x/");
+  await expect.poll(() => commentState(page, "c1")).toBe("ai");
+  for (const id of ["c2", "c3", "c4"]) expect(await commentState(page, id)).toBe("clean");
+  expect(await commentState(page, "c5")).toBe("ai"); // bot callouts count by default
+
+  // The badge sits right after the author's name, with the reply as its title.
+  const meta = comment(page, "c1").locator("[slot=commentMeta]").first();
+  const badge = meta.locator(".author-hovercard-trigger + .rab-badge");
+  await expect(badge).toHaveText("Potential AI");
+  await expect(badge).toHaveAttribute("title", /\(\+300\) "reads like ChatGPT"/);
+  await expect(page.locator(".rab-badge")).toHaveCount(2);
+
+  // Each paragraph gets its own spoiler; the replies stay readable.
+  const body = comment(page, "c1").locator("[slot=comment]").first();
+  const spoilers = body.locator("shreddit-spoiler.rab-spoiler");
+  await expect(spoilers).toHaveCount(2);
+  await expect(spoilers.first()).toHaveAttribute("embed-obscured", "");
+  await expect(comment(page, "r1").locator("shreddit-spoiler")).toHaveCount(0);
+
+  // Revealing one paragraph reveals the whole comment.
+  await spoilers.first().click();
+  await expect.poll(() => commentState(page, "c1")).toBe("revealed");
+  await expect(spoilers.nth(1)).not.toHaveAttribute("embed-obscured", "");
+  expect(page.url()).toContain("/thread1/");
+});
+
+test("comment fallback spoiler: a bar that hides links until revealed", async ({ ext }) => {
+  const page = await ext.context.newPage();
+  await page.goto("https://www.reddit.com/r/test/comments/thread1/x/");
+  await expect.poll(() => commentState(page, "c1")).toBe("ai");
+  const spoilers = comment(page, "c1").locator("[slot=comment]").first().locator("span.rab-spoiler");
+  await expect(spoilers).toHaveCount(2);
+  expect(await spoilers.first().locator(".rab-spoiler-inner").evaluate((e) => getComputedStyle(e).opacity)).toBe("0");
+  await spoilers.nth(1).locator("a").click(); // swallowed: reveals instead of following
+  await expect.poll(() => commentState(page, "c1")).toBe("revealed");
+  expect(page.url()).toContain("/thread1/");
+  await expect(spoilers.first()).toHaveClass(/rab-revealed/);
+  expect(await spoilers.first().locator(".rab-spoiler-inner").evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
+});
+
+test("popup: collapse style, bot callouts off, comments off; each applies live", async ({ ext }) => {
+  const page = await ext.context.newPage();
+  await page.goto("https://www.reddit.com/r/test/comments/thread1/x/");
+  await expect.poll(() => commentState(page, "c1")).toBe("ai");
+  const popup = await openPopup(ext);
+
+  await popup.getByText("Collapsed", { exact: true }).click();
+  const details = comment(page, "c1").locator(":scope > details");
+  await expect.poll(() => details.evaluate((d) => d.open)).toBe(false);
+  await expect(comment(page, "c1").locator(".rab-spoiler")).toHaveCount(0);
+  await expect(comment(page, "c1").locator(".rab-badge")).toHaveText("Potential AI");
+
+  await popup.locator("input[name=bots]").click();
+  await expect.poll(() => commentState(page, "c5")).toBe("clean");
+  expect(await commentState(page, "c1")).toBe("ai"); // the AI callout still counts
+
+  await popup.locator("input[name=comments]").click();
+  await expect(page.locator(".rab-badge")).toHaveCount(0);
+  await expect.poll(() => details.evaluate((d) => d.open)).toBe(true);
+  await expect(popup.locator("[data-group=commentStyle]")).toHaveClass(/off/);
+
+  // Switching back on changes nothing in the page, yet the comments are
+  // judged again. The wait outlasts the 250 ms scan that lifting the badges
+  // queued, so that scan cannot be what re-judges them.
+  await page.waitForTimeout(600);
+  expect(await commentState(page, "c1")).toBeNull();
+  await popup.locator("input[name=comments]").click();
+  await expect.poll(() => commentState(page, "c1")).toBe("ai");
+  await expect(comment(page, "c1").locator(".rab-badge")).toHaveCount(1);
+});
+
+test("old reddit comments get the flair badge and the fallback spoiler", async ({ ext }) => {
+  const page = await ext.context.newPage();
+  await page.goto("https://old.reddit.com/r/test/comments/thread1/x/");
+  await expect.poll(() => commentState(page, "c1")).toBe("ai");
+  for (const id of ["c2", "c3", "c4"]) expect(await commentState(page, id)).toBe("clean");
+  await expect(comment(page, "c1").locator(":scope > .entry .tagline .author + .flair.rab-badge")).toHaveText("Potential AI");
+  await expect(comment(page, "c1").locator(":scope > .entry .md span.rab-spoiler")).toHaveCount(2);
+});
+
+test("popup: posts off lifts the blur, on restores it from cache; strictness re-judges", async ({ ext }) => {
+  const page = await ext.context.newPage();
+  await page.goto("https://www.reddit.com/r/test/");
+  await expect.poll(() => state(page, "ai1")).toBe("ai");
+  await scrollTo(page, "lowvote");
+  await expect.poll(() => state(page, "lowvote")).toBe("ai");
+  const popup = await openPopup(ext);
+  await expect(popup.locator("#stats")).toHaveText("2 flagged of 2 checked posts");
+
+  await popup.locator("input[name=posts]").click();
+  await expect(page.locator(".rab-overlay")).toHaveCount(0);
+  await expect.poll(() => state(page, "lowvote")).toBe("off");
+  expect(await page.locator("#t3_ai1").evaluate((e) => getComputedStyle(e).filter)).toBe("none");
+  // A verdict written meanwhile (by another tab, or a fetch already in
+  // flight) does not blur either.
+  await popup.evaluate(() => chrome.storage.local.set({ "p:lowvote": { v: 1, m: "x", t: Date.now(), n: 9 } }));
+  await page.waitForTimeout(300);
+  expect(await state(page, "lowvote")).toBe("off");
+  await expect(page.locator(".rab-overlay")).toHaveCount(0);
+
+  const before = ext.fetched.length;
+  await popup.locator("input[name=posts]").click();
+  await expect.poll(() => state(page, "ai1")).toBe("ai");
+  expect(ext.fetched.length).toBe(before);
+
+  // Strict needs 35% of the top comment: lowvote's +120 against +500 fails.
+  await popup.getByText("Strict", { exact: true }).click();
+  await expect(popup.locator("#strictness-hint")).toHaveText("A callout needs 10+ points and 35% of the top comment's score");
+  await expect.poll(() => state(page, "lowvote")).toBe("clean");
+  expect(ext.fetched.length).toBeGreaterThan(before);
+
+  await popup.locator("#clear").click();
+  await expect(popup.locator("#stats")).toHaveText("0 flagged of 0 checked posts");
 });

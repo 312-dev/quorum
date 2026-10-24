@@ -3,9 +3,14 @@
 // NSFW blur, relabelled "Potential AI", when a well-upvoted, non-controversial
 // comment calls it out as AI (rules in detect.js). Verdicts are cached in
 // chrome.storage.local so a post is fetched at most once per TTL across every
-// tab.
+// tab. On a comments page, a comment whose replies call it out as AI-written
+// is hidden behind Reddit's spoiler (or collapsed) and badged "Potential AI".
+// Options come from the toolbar popup (settings.js) and apply live.
 (() => {
-  const { pickReputableMention, isBotLikeAccount, BOT_REL_SCORE } = globalThis.RAB_DETECT;
+  const { pickReputableMention, findAiMention, findCommentMention, isCommentDenial, isBotLikeAccount, BOT_REL_SCORE } =
+    globalThis.RAB_DETECT;
+  const { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings } = globalThis.RAB_SETTINGS;
+  let settings = { ...DEFAULTS };
 
   const IS_OLD = location.hostname.startsWith("old.");
   const SELECTOR = IS_OLD ? ".thing.link[data-fullname^='t3_']" : "shreddit-post[id^='t3_']";
@@ -14,7 +19,6 @@
   const NEG_GROWTH = 10; // ...or once it has gained this many comments
   const FAIL_BACKOFF = 60e3;
   const MAX_CONCURRENT = 2;
-  const DWELL_MS = 2000; // time in the middle of the screen before a fetch
   const JSON_URL = (id) =>
     `${location.origin}/comments/${id}.json?limit=100&depth=3&sort=top&raw_json=1`;
   // The comments-only HTML partial New Reddit lazy-loads under a post. Used
@@ -38,6 +42,7 @@
   const inflight = new Set();
   const failedAt = new Map();
   const revealed = new Set();
+  const undos = new Map(); // id -> removes the post's blur
   const queue = [];
   let active = 0;
   let pausedUntil = 0;
@@ -63,7 +68,7 @@
 
   // One read of the whole cache at startup is cheaper than a storage round trip
   // per post; expired entries are dropped on the way in.
-  const ready = chrome.storage.local.get(null).then((all) => {
+  const cacheReady = chrome.storage.local.get(null).then((all) => {
     const stale = [];
     const now = Date.now();
     for (const [k, e] of Object.entries(all)) {
@@ -78,14 +83,46 @@
     }
     if (stale.length) chrome.storage.local.remove(stale);
   });
+  const ready = Promise.all([cacheReady, loadSettings().then((s) => (settings = s))]);
+
+  // The vote bar and phrase test for posts under the current settings.
+  const postRules = () => ({ ...STRICTNESS[settings.strictness], find: (t) => findAiMention(t, settings) });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     for (const [k, { newValue }] of Object.entries(changes)) {
-      if (!k.startsWith("p:") || !newValue) continue;
+      if (!k.startsWith("p:")) continue;
       const id = k.slice(2);
+      if (!newValue) {
+        mem.delete(id); // cleared from the popup
+        continue;
+      }
       mem.set(id, newValue);
       if (els.has(id)) render(id);
+    }
+  });
+
+  // A change in the popup reaches every open tab, and every blur is lifted
+  // and re-applied under the new settings. On a rule change the popup clears
+  // the stored verdicts first; their removal (above) drops them here too, so
+  // the posts are judged again.
+  chrome.storage.onChanged.addListener(async (changes, area) => {
+    if (area !== "sync" || !changes.settings) return;
+    await ready;
+    const prev = settings;
+    settings = { ...DEFAULTS, ...changes.settings.newValue };
+    const changed = (k) => prev[k] !== settings[k];
+    if (["posts", ...RULE_KEYS].some(changed)) {
+      for (const id of [...undos.keys()]) unflag(id);
+      for (const id of els.keys()) {
+        if (focused.has(id)) check(id);
+        else showCached(id);
+      }
+    }
+    if (["comments", "commentStyle", ...RULE_KEYS].some(changed)) {
+      for (const id of [...commentUndos.keys()]) unhideComment(id);
+      judged.clear();
+      scanComments();
     }
   });
 
@@ -99,6 +136,10 @@
     await ready;
     const el = els.get(id);
     if (!el) return true;
+    if (!settings.posts) {
+      setState(id, "off");
+      return true;
+    }
     const { comments } = postInfo(el);
     if (isFresh(mem.get(id), comments)) {
       render(id);
@@ -112,7 +153,7 @@
   }
 
   async function check(id) {
-    if (await showCached(id)) return;
+    if (await showCached(id)) return; // also covers posts switched off
     if (inflight.has(id) || queue.includes(id)) return;
     if (Date.now() - (failedAt.get(id) || 0) < FAIL_BACKOFF) return;
     setState(id, "pending");
@@ -167,13 +208,14 @@
     const comments = json
       ? flattenListing((await res.json().catch(() => null))?.[1])
       : parsePartial(await res.text());
-    let hit = pickReputableMention(comments);
+    const rules = postRules();
+    let hit = pickReputableMention(comments, rules);
     let note = "";
     // A callout that fails only the relative vote bar is worth the account
     // lookup: a karma-farming poster lowers that bar.
     const { author } = postInfo(els.get(id));
-    if (!hit && !IS_OLD && author) {
-      const relaxed = pickReputableMention(comments, BOT_REL_SCORE);
+    if (!hit && !IS_OLD && author && settings.bots) {
+      const relaxed = pickReputableMention(comments, { ...rules, rel: BOT_REL_SCORE });
       if (relaxed && isBotLikeAccount(await accountFor(author))) {
         hit = relaxed;
         note = " · new karma-farming account";
@@ -276,6 +318,7 @@
     const el = els.get(id);
     const entry = mem.get(id);
     if (!el || !entry) return;
+    if (!settings.posts) return setState(id, "off");
     if (!entry.v) return setState(id, "clean");
     if (revealed.has(id)) return setState(id, "revealed");
     setState(id, "ai");
@@ -286,8 +329,16 @@
   const ARIA_LABEL = "Potential AI, click to reveal";
 
   function flag(id, el, snippet) {
+    if (undos.has(id)) return;
     const title = snippet ? `Upvoted comment ${snippet}` : "";
-    if (IS_OLD || !blurWithReddit(id, el, title)) blurWithOverlay(id, el, title);
+    const undo = (!IS_OLD && blurWithReddit(id, el, title)) || blurWithOverlay(id, el, title);
+    undos.set(id, undo);
+  }
+
+  function unflag(id) {
+    undos.get(id)?.();
+    undos.delete(id);
+    setState(id, "seen");
   }
 
   // What Reddit blurs on an NSFW post: the contents of the media box (whose
@@ -312,7 +363,6 @@
   function blurWithReddit(id, el, title) {
     const target = blurTarget(el);
     const host = target ? target.host : el.parentElement;
-    if (host.querySelector(":scope > shreddit-blurred-container.rab-blur")) return true;
     const box = document.createElement("shreddit-blurred-container");
     box.className = "rab-blur";
     box.setAttribute("reason", "nsfw");
@@ -339,15 +389,21 @@
     const labeller = new MutationObserver(() => relabel(box));
     if (box.shadowRoot) labeller.observe(box.shadowRoot, { childList: true, subtree: true, characterData: true });
     relabel(box);
-    new MutationObserver((_, obs) => {
+    const watcher = new MutationObserver(() => {
       if (box.hasAttribute("embed-obscured")) return;
-      obs.disconnect();
+      watcher.disconnect();
       labeller.disconnect();
       revealed.add(id);
       box.removeAttribute("title");
       setState(id, "revealed");
-    }).observe(box, { attributes: true, attributeFilter: ["embed-obscured"] });
-    return true;
+    });
+    watcher.observe(box, { attributes: true, attributeFilter: ["embed-obscured"] });
+    // Lifting the blur puts the content back where it was.
+    return () => {
+      watcher.disconnect();
+      labeller.disconnect();
+      box.replaceWith(...slot.childNodes);
+    };
   }
 
   function relabel(box) {
@@ -380,7 +436,6 @@
 
   function blurWithOverlay(id, el, title) {
     const wrap = wrapperFor(el);
-    if (wrap.querySelector(":scope > .rab-overlay")) return;
     wrap.classList.add("rab-flagged");
     const overlay = document.createElement("div");
     overlay.className = "rab-overlay";
@@ -401,11 +456,199 @@
     };
     overlay.addEventListener("click", reveal);
     wrap.append(overlay);
+    return () => {
+      overlay.remove();
+      wrap.classList.remove("rab-flagged");
+    };
+  }
+
+  // Comments. A comment is hidden when one of its direct replies calls it out
+  // as AI-written (or as a bot) and that reply passes the same vote rules
+  // among its sibling replies. Everything needed is already in the page, so
+  // this costs no request; it reruns as more replies load.
+  const C_SELECTOR = IS_OLD ? ".thing.comment" : "shreddit-comment[thingid]";
+  const judged = new Map(); // comment id -> how many replies it was judged on
+  const commentUndos = new Map(); // comment id -> lifts its spoiler or collapse and badge
+  const BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, pre, td, th";
+
+  const commentId = (el) => (IS_OLD ? el.dataset.fullname : el.getAttribute("thingid"));
+  const parentCommentId = (el) =>
+    IS_OLD ? el.parentElement?.closest(".thing.comment")?.dataset.fullname : el.getAttribute("parentid");
+
+  // The comment's own body, never a reply's (replies are nested inside it).
+  function ownBody(el) {
+    if (IS_OLD) return el.querySelector(":scope > .entry .usertext-body .md");
+    const body = el.querySelector("[slot='comment']");
+    return body?.closest("shreddit-comment") === el ? body : null;
+  }
+
+  function commentData(el) {
+    const body = ownBody(el)?.textContent || "";
+    if (!IS_OLD) return { body, score: +el.getAttribute("score") || 0, controversiality: 0, score_hidden: false };
+    // Old Reddit prints each score three ways (dislikes, unvoted, likes), with
+    // the plain number in the title; a hidden score has none.
+    const score = el.querySelector(":scope > .entry .tagline .score.unvoted");
+    return {
+      body,
+      score: score ? +score.title || 0 : 0,
+      score_hidden: !score,
+      controversiality: el.classList.contains("controversial") ? 1 : 0,
+    };
+  }
+
+  async function scanComments() {
+    await ready;
+    if (!settings.comments) return;
+    const all = document.querySelectorAll(C_SELECTOR);
+    const replies = new Map();
+    for (const el of all) {
+      const parent = parentCommentId(el);
+      if (!parent) continue;
+      if (!replies.has(parent)) replies.set(parent, []);
+      replies.get(parent).push(el);
+    }
+    const rules = {
+      ...STRICTNESS[settings.strictness],
+      find: (t) => findCommentMention(t, settings),
+      deny: isCommentDenial,
+    };
+    for (const el of all) {
+      const id = commentId(el);
+      const kids = replies.get(id);
+      if (!kids || commentUndos.has(id) || judged.get(id) === kids.length) continue;
+      judged.set(id, kids.length);
+      const hit = pickReputableMention(kids.map(commentData), rules);
+      el.setAttribute("data-rab-comment", hit ? "ai" : "clean");
+      if (hit) hideComment(id, el, `Reply (+${hit.score}) "${hit.snippet}"`);
+    }
+  }
+
+  function hideComment(id, el, title) {
+    const undo = [addBadge(el, title)];
+    undo.push(settings.commentStyle === "collapse" ? collapse(el) : spoil(el));
+    commentUndos.set(id, () => undo.forEach((f) => f()));
+  }
+
+  function unhideComment(id) {
+    commentUndos.get(id)?.();
+    commentUndos.delete(id);
+    document.querySelector(IS_OLD ? `.thing[data-fullname="${id}"]` : `shreddit-comment[thingid="${id}"]`)
+      ?.removeAttribute("data-rab-comment");
+  }
+
+  // The label sits beside the author's name, styled as Reddit styles user
+  // flair there (its own utility classes on New Reddit, .flair on old).
+  function addBadge(el, title) {
+    const badge = document.createElement("span");
+    badge.textContent = LABEL;
+    badge.title = title;
+    let anchor;
+    if (IS_OLD) {
+      badge.className = "flair rab-badge";
+      anchor = el.querySelector(":scope > .entry .tagline .author");
+    } else {
+      badge.className =
+        "rab-badge bg-tone-4 inline-block max-w-full text-12 font-normal align-text-bottom box-border px-[6px] rounded-5 leading-4 ms-2xs";
+      const meta = [...el.querySelectorAll("[slot='commentMeta']")].find((m) => m.closest("shreddit-comment") === el);
+      const name = meta?.querySelector(".author-name-meta");
+      anchor = name?.closest(".author-hovercard-trigger") || name;
+    }
+    if (!anchor) return () => {};
+    anchor.after(badge);
+    return () => badge.remove();
+  }
+
+  // Reddit's own collapse: the same <details> toggle its collapse button
+  // flips, so the badge stays on the one-line row.
+  function collapse(el) {
+    if (IS_OLD) {
+      if (!el.classList.contains("noncollapsed")) return () => {};
+      el.classList.replace("noncollapsed", "collapsed");
+      return () => el.classList.replace("collapsed", "noncollapsed");
+    }
+    const details = el.querySelector(":scope > details");
+    if (!details?.open) return () => {};
+    details.open = false;
+    return () => (details.open = true);
+  }
+
+  // Reddit's spoiler: its <shreddit-spoiler> is inline, so each paragraph (or
+  // list item, heading, cell) gets its own, and revealing one reveals the
+  // rest. Where the component is missing (old Reddit), content.css draws the
+  // same bar with its measured values.
+  function spoil(el) {
+    const body = ownBody(el);
+    if (!body) return () => {};
+    let blocks = [...body.querySelectorAll(BLOCKS)].filter((b) => !b.querySelector(BLOCKS));
+    if (!blocks.length) blocks = [body];
+    const native = !IS_OLD && isDefined("shreddit-spoiler");
+    const spoilers = blocks.map((block) => {
+      const sp = document.createElement(native ? "shreddit-spoiler" : "span");
+      sp.classList.add("rab-spoiler");
+      if (native) sp.append(...block.childNodes);
+      else {
+        const inner = document.createElement("span");
+        inner.className = "rab-spoiler-inner";
+        inner.append(...block.childNodes);
+        sp.append(inner);
+        sp.setAttribute("role", "button");
+        sp.tabIndex = 0;
+        sp.title = "Reveal spoiler";
+      }
+      block.append(sp);
+      return sp;
+    });
+    const isHidden = (sp) => (native ? sp.hasAttribute("embed-obscured") : !sp.classList.contains("rab-revealed"));
+    const revealAll = () => {
+      for (const sp of spoilers) {
+        if (!isHidden(sp)) continue;
+        if (native) sp.shadowRoot?.querySelector(".outer")?.click();
+        else sp.classList.add("rab-revealed");
+      }
+      el.setAttribute("data-rab-comment", "revealed");
+    };
+    let watcher = null;
+    let onClick = null;
+    if (native) {
+      // The component drops embed-obscured when clicked open.
+      watcher = new MutationObserver(() => spoilers.some((sp) => !isHidden(sp)) && revealAll());
+      for (const sp of spoilers) watcher.observe(sp, { attributes: true, attributeFilter: ["embed-obscured"] });
+    } else {
+      onClick = (e) => {
+        if (!e.target.closest?.(".rab-spoiler") || !spoilers.some(isHidden)) return;
+        e.preventDefault(); // a link under the bar is not followed until revealed
+        e.stopPropagation();
+        revealAll();
+      };
+      body.addEventListener("click", onClick, true);
+    }
+    return () => {
+      watcher?.disconnect();
+      if (onClick) body.removeEventListener("click", onClick, true);
+      for (const sp of spoilers) {
+        const content = native ? sp : sp.firstChild;
+        sp.replaceWith(...content.childNodes);
+      }
+    };
+  }
+
+  // A content script cannot read the page's custom element registry, but an
+  // upgraded element matches :defined.
+  const definedTags = new Map();
+  function isDefined(tag) {
+    if (definedTags.get(tag)) return true; // a miss is retried: Reddit may define it later
+    const probe = document.createElement(tag);
+    document.body.append(probe);
+    const ok = probe.matches(":defined");
+    probe.remove();
+    definedTags.set(tag, ok);
+    return ok;
   }
 
   // Two observers. Near the viewport, a cached verdict is applied at once so a
   // known post is blurred before it scrolls into view. Fetching waits until a
-  // post has stayed in the middle half of the screen for DWELL_MS, so posts
+  // post has stayed in the middle half of the screen for the dwell setting
+  // (2 s by default), so posts
   // flicked past while scrolling cost no request.
   const near = new IntersectionObserver(
     (entries) => {
@@ -427,7 +670,7 @@
         if (isIntersecting) {
           focused.add(id);
           // The post a post page is about was opened on purpose: no dwell.
-          const dwell = target.getAttribute("view-context") === "CommentsPage" ? 0 : DWELL_MS;
+          const dwell = target.getAttribute("view-context") === "CommentsPage" ? 0 : settings.dwell * 1000;
           dwellTimers.set(id, setTimeout(() => focused.has(id) && check(id), dwell));
         } else {
           focused.delete(id);
@@ -446,11 +689,13 @@
     }
   }
 
-  // Infinite scroll adds posts in batches; coalesce mutation bursts into one
-  // scan every 250 ms rather than walking the DOM per mutation.
+  // Infinite scroll adds posts, and comment pages add replies, in batches;
+  // coalesce mutation bursts into one scan every 250 ms rather than walking
+  // the DOM per mutation.
   let scanTimer = 0;
   new MutationObserver(() => {
-    if (!scanTimer) scanTimer = setTimeout(() => ((scanTimer = 0), scan()), 250);
+    if (!scanTimer) scanTimer = setTimeout(() => ((scanTimer = 0), scan(), scanComments()), 250);
   }).observe(document.documentElement, { childList: true, subtree: true });
   scan();
+  scanComments();
 })();

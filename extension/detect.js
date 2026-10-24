@@ -1,6 +1,7 @@
 // Phrase matching for comments that question or call out a post as AI-made
-// or as a bot / karma-farming post, plus the vote filter that decides whether
-// such a comment is trusted and the account test that can relax it.
+// or as a bot / karma-farming post, and for replies that call out a comment
+// as written by AI; plus the vote filter that decides whether such a comment
+// is trusted and the account test that can relax it.
 // Loaded as a content script ahead of content.js (shared global scope) and
 // evaluated directly by the unit tests, so it must stay dependency-free.
 (function (root) {
@@ -11,7 +12,7 @@
   const NOT_VERDICT = String.raw`(?![\s,]*(?:or not|is|are|was|were|has|have|can|could|would|will|does|doesn'?t|isn'?t|detectors?|tools?|compan(?:y|ies)|models?|safety|researchers?)\b|[- ]?(?:assisted|enhanced|powered|upscaled)\b)`;
   const LEAD = String.raw`^[\s"'*>]*(?:(?:definitely|obviously|clearly|absolutely|100%|yep|yes|yeah|yup|it'?s|that'?s|this is|looks)[\s,.!:]+)*`;
 
-  const PATTERNS = [
+  const AI_PATTERNS = [
     // "is this AI", "is that an AI image", "is it A.I.?"
     new RegExp(String.raw`\bis (?:this|that|it|this one|the (?:video|image|pic|picture|photo)) (?:an? )?${AI}\b`, "i"),
     // A verdict that opens the comment: "AI for the reasons others said", "Yep, AI."
@@ -29,6 +30,9 @@
     /\b(?:slop ?post|slopfest|more slop|pure slop|this slop)\b/i,
     // "there's a Sora watermark"
     /\bsora watermark\b/i,
+  ];
+
+  const BOT_PATTERNS = [
     // Bot callouts: "OP is a bot", "you are a karma farming bot", "this is a
     // bot account"; not "95% of this site is repost bots" (no subject, plural)
     /\b(?:op|this|that|it|he|she|they|you|account|user)(?: is|'s|s| are|'re)? (?:clearly |obviously |definitely |probably |100% |just |another )?(?:an? )?(?:(?:karma[- ]?farm(?:ing)?|repost|spam|engagement[- ]bait|ai)[- ])?bot\b/i,
@@ -40,6 +44,42 @@
     new RegExp(String.raw`${LEAD}(?:bot(?: account)?|karma[- ]?farm(?:ing|er))\s*(?:[.!,:;]|$)`, "i"),
   ];
 
+  // Replies that say the comment above them was written by AI. Kept apart
+  // from AI_PATTERNS because a reply under a comment on a picture post ("AI.",
+  // "looks like AI") is usually about the picture, not the comment; these
+  // name the writing or the writer.
+  const NOT_AI = new RegExp(String.raw`\b(?:not|no|isn'?t|ain'?t|wasn'?t)\s+(?:an?\s+)?${AI}\b`, "i");
+  const WRITER = String.raw`(?:chat ?gpt|gpt|${AI}|an? llm|llms?|claude|gemini|grok|copilot|deepseek)`;
+  const COMMENT_PATTERNS = [
+    // "written by ChatGPT", "typed with AI"
+    new RegExp(String.raw`\b(?:written|typed|generated|produced|made|crafted|composed) (?:by|with|using|in|through) ${WRITER}\b`, "i"),
+    // "sounds like ChatGPT", "reads like an LLM", "smells like AI"
+    new RegExp(String.raw`\b(?:sounds|reads|smells|feels) (?:like |so )?(?:a )?(?:${WRITER}|bot)\b`, "i"),
+    // "AI-written", "ChatGPT response", "GPT ahh comment", "AI slop"
+    new RegExp(String.raw`\b${WRITER}[- ](?:written|generated|response|reply|comment|answer|slop|text|post|ahh?|ass|vibes)\b`, "i"),
+    // "thanks ChatGPT", "ok Grok", "nice try ChatGPT"
+    /\b(?:thanks|thank you|ok|okay|alright|nice try|cool story),? (?:chat ?gpt|gpt|grok|gemini|claude|copilot)\b/i,
+    // "this comment is AI", "your reply was clearly written by a bot"
+    new RegExp(String.raw`\b(?:this|that|your|the above|op'?s) (?:comment|reply|response|answer|text|paragraph)\b(?! section)[^.!?\n]{0,30}\b(?:${WRITER}|a bot)\b`, "i"),
+    // "did ChatGPT write this", "did you use AI"
+    new RegExp(String.raw`\bdid (?:${WRITER} (?:write|make|generate)|you (?:use|ask) ${WRITER})\b`, "i"),
+    // "you're an AI", "you are ChatGPT"
+    new RegExp(String.raw`\b(?:you'?re|you are|ur) (?:clearly |obviously |definitely |just |literally )?${WRITER}\b`, "i"),
+    // "the em dashes give it away"
+    /\bem[- ]?dash(?:es)?\b[^.!?\n]{0,30}\b(?:give|gives|gave|giveaway|dead giveaway|ai|gpt|chat ?gpt|bot)\b/i,
+    // prompt-injection jokes aimed at bots
+    /\bignore (?:all )?(?:previous|prior|your|the above) (?:instructions|prompts?)\b/i,
+  ];
+
+  // Replies saying the comment is human-written: "not AI", "not a bot",
+  // "I wrote this myself".
+  const COMMENT_DENIALS = [
+    NOT_AI,
+    /\b(?:not|isn'?t|ain'?t|wasn'?t) (?:an? )?bot\b/i,
+    new RegExp(String.raw`\b(?:not|isn'?t|wasn'?t) (?:written by )?${WRITER}\b`, "i"),
+    /\bi (?:wrote|typed) (?:this|it|that)(?: myself)?\b/i,
+  ];
+
   // Bots announcing themselves ("I am a bot, and this action was performed
   // automatically") are not callouts.
   const SELF_DISCLOSED_BOT = /\b(?:i am|i'm) a bot\b|\bperformed automatically\b/i;
@@ -47,7 +87,7 @@
   // Comments that say the opposite: "Not AI", "Real.", "it's a real photo";
   // not "this is a real photo for reference", which posts a comparison.
   const DENIALS = [
-    new RegExp(String.raw`\b(?:not|no|isn'?t|ain'?t|wasn'?t)\s+(?:an?\s+)?${AI}\b`, "i"),
+    NOT_AI,
     /\b(?:not|isn'?t|ain'?t|wasn'?t) (?:an? )?bot\b/i,
     new RegExp(String.raw`${LEAD}real\b`, "i"),
     /\b(?:it'?s|this is|that'?s|looks|definitely|totally) (?:100% |completely |totally |definitely )?(?:a )?real\b(?!ly)(?!(?:\s+\w+){0,2}\s+(?:for (?:reference|comparison)|to compare))/i,
@@ -61,19 +101,27 @@
     return null;
   };
 
-  // Returns the matched snippet (for the overlay tooltip) or null. A comment
-  // that also denies it ("looks like AI but it's real") is not a callout.
-  function findAiMention(text) {
+  // Returns the matched snippet (for the tooltip) or null. A comment that
+  // also denies it ("looks like AI but it's real") is not a callout. With
+  // bots: false, only AI callouts count.
+  function findAiMention(text, { bots = true } = {}) {
     if (!text || SELF_DISCLOSED_BOT.test(text) || firstMatch(DENIALS, text)) return null;
-    return firstMatch(PATTERNS, text);
+    return firstMatch(AI_PATTERNS, text) || (bots ? firstMatch(BOT_PATTERNS, text) : null);
+  }
+
+  // The same for a reply judging the comment it answers.
+  function findCommentMention(text, { bots = true } = {}) {
+    if (!text || SELF_DISCLOSED_BOT.test(text) || firstMatch(COMMENT_DENIALS, text)) return null;
+    return firstMatch(COMMENT_PATTERNS, text) || (bots ? firstMatch(BOT_PATTERNS, text) : null);
   }
 
   const isDenial = (text) => !!text && !!firstMatch(DENIALS, text);
+  const isCommentDenial = (text) => !!text && !!firstMatch(COMMENT_DENIALS, text);
 
   // A mention only counts when the thread agrees with it: the comment is not
-  // marked controversial, its score is visible, it scores at least MIN_SCORE
-  // and REL_SCORE of the thread's best comment, and it outscores every
-  // visible, non-controversial comment saying the post is real. When the
+  // marked controversial, its score is visible, it scores at least `min`
+  // (MIN_SCORE) and `rel` (REL_SCORE) of the best comment it is compared
+  // with, and it outscores every visible, non-controversial denial. When the
   // poster's account looks like a bot (isBotLikeAccount), the relative bar
   // drops to BOT_REL_SCORE; the floor and the denial rule still apply.
   const MIN_SCORE = 5;
@@ -81,21 +129,26 @@
   const BOT_REL_SCORE = 0.05;
 
   // comments: [{ body, score, controversiality, score_hidden }]
+  // find / deny: the phrase tests, findAiMention and isDenial for a post's
+  // comments, findCommentMention and isCommentDenial for a comment's replies.
   // Returns { snippet, score } for the best-scoring reputable match, or null.
-  function pickReputableMention(comments, rel = REL_SCORE) {
+  function pickReputableMention(
+    comments,
+    { rel = REL_SCORE, min = MIN_SCORE, find = findAiMention, deny = isDenial } = {}
+  ) {
     let top = 0;
     let denied = -Infinity;
     for (const c of comments) {
       if (c.score_hidden) continue;
       if (c.score > top) top = c.score;
-      if (!c.controversiality && c.score > denied && isDenial(c.body)) denied = c.score;
+      if (!c.controversiality && c.score > denied && deny(c.body)) denied = c.score;
     }
-    const bar = Math.max(MIN_SCORE, rel * top, denied + 1);
+    const bar = Math.max(min, rel * top, denied + 1);
     let best = null;
     for (const c of comments) {
       if (c.score_hidden || c.controversiality || !(c.score >= bar)) continue;
       if (best && c.score <= best.score) continue;
-      const snippet = findAiMention(c.body);
+      const snippet = find(c.body);
       if (snippet) best = { snippet, score: c.score };
     }
     return best;
@@ -119,7 +172,7 @@
   }
 
   root.RAB_DETECT = {
-    findAiMention, isDenial, pickReputableMention, isBotLikeAccount,
-    PATTERNS, DENIALS, MIN_SCORE, REL_SCORE, BOT_REL_SCORE,
+    findAiMention, findCommentMention, isDenial, isCommentDenial, pickReputableMention, isBotLikeAccount,
+    MIN_SCORE, REL_SCORE, BOT_REL_SCORE,
   };
 })(globalThis);

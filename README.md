@@ -2,7 +2,9 @@
 
 Chrome extension (MV3) that blurs Reddit posts whose comments call them out as AI or as bot /
 karma-farming posts, using Reddit's own NSFW blur with the button relabelled `Potential AI`. Click it to reveal the post. Works in feeds
-and on a post's own page. r/isthisAI is a good place to try it.
+and on a post's own page. On a comments page it also hides comments that replies call out as
+AI-written, behind Reddit's spoiler bar with a `Potential AI` badge beside the author. r/isthisAI is
+a good place to try it.
 
 ## Install
 
@@ -12,10 +14,27 @@ and on a post's own page. r/isthisAI is a good place to try it.
    server starts; the worker retries every 30 s. Replacing the whole directory (a checkout, a
    copy) is fine too: the server waits for `manifest.json` to be back, then watches it afresh.
 
+## Options
+
+Click the toolbar icon. Changes apply at once in every open Reddit tab and sync with your Chrome
+profile (`chrome.storage.sync`, defaults in `extension/settings.js`):
+
+| Option | Default | |
+|---|---|---|
+| Posts | on | Blur posts that comments call out |
+| Comments | on | Hide comments that replies call out |
+| Hide comments as | Spoiler | Spoiler, or Reddit's own collapse |
+| Bot callouts | on | Count bot and karma-farming callouts and the account check, not just AI ones |
+| Strictness | Normal | Lenient: 3 points and 10% of the top comment; Normal: 5 and 20%; Strict: 10 and 35% |
+| Wait before checking a post | 2 s | The dwell below; 0 to 5 s |
+
+Changing Bot callouts or Strictness clears the cached verdicts so posts are judged again. The panel
+also shows how many cached posts are flagged and clears the cache (verdicts and accounts).
+
 ## How it decides
 
 - A post's comments are fetched only after the post has stayed in the middle half of the screen
-  for 2 s (`DWELL_MS`), so posts flicked past while scrolling cost nothing. At most 2 fetches run
+  for 2 s (the Wait option), so posts flicked past while scrolling cost nothing. At most 2 fetches run
   at a time, and a queued post that leaves the middle before its turn is dropped until it dwells
   again. Posts with 0 comments are never fetched. On a post's own page the post is checked at once.
 - Comments come from `/comments/<id>.json` (top 100, depth 3). If Reddit answers that with its 403
@@ -25,18 +44,19 @@ and on a post's own page. r/isthisAI is a good place to try it.
 - A comment counts only if it matches a phrase in `extension/detect.js` ("is this AI", "AI slop",
   "looks like AI", "done with AI", or a reply that opens with the verdict, like "AI, look at the
   hands") **and** is reputable: not marked controversial, score visible, at least 5 points and at
-  least 20% of the thread's top comment (`MIN_SCORE`, `REL_SCORE`). The HTML partial reports
+  least 20% of the thread's top comment (Normal strictness; `STRICTNESS` in `settings.js`). The HTML partial reports
   hidden scores as 1, so those never qualify.
 - Bot callouts count the same way: "OP is a bot", "you are a karma farming bot", "this is a bot
   account", or a reply opening with "Bot." or "Karma farming.". Remarks about bots in general ("95%
   of this site is repost bots", "a karma farm bot fest") and bots describing themselves ("I am a
   bot", "...performed automatically") do not.
-- Account signals: when a callout fails only the 20% bar, the extension reads the poster's account
+- Account signals: when a callout fails only the relative bar (20% at Normal), the extension reads the poster's account
   from Reddit's author hover card (`/svc/shreddit/user-hover-card/<name>`: cake day, post and
   comment karma; about 300 KB, so only then, cached per author for 7 days). An account under 90
   days old with post karma of at least 1,000 and 5 times its comment karma lowers the bar to 5% of
-  the top comment (`isBotLikeAccount`, `BOT_REL_SCORE`); the 5-point floor and consensus still
-  apply, and an account never blurs a post on its own. New Reddit only.
+  the top comment (`isBotLikeAccount`, `BOT_REL_SCORE`); the points floor and consensus still
+  apply, and an account never blurs a post on its own. New Reddit only; skipped when Bot callouts
+  is off.
 - Consensus: the callout must also outscore every visible, non-controversial comment saying the
   post is real ("Not AI", "Real.", "it's a real photo", but not "a real photo for reference"). A
   comment that says both counts as a denial.
@@ -46,8 +66,17 @@ and on a post's own page. r/isthisAI is a good place to try it.
   post comes near the screen, with no dwell, so a post flagged in the feed is already blurred when
   you open it.
 
-Each post carries `data-rab-state` (`seen`, `pending`, `clean`, `ai`, `revealed`, `error`,
-`queued-offscreen`) for debugging in DevTools.
+Comments are judged from the page itself, so they cost no request. A comment is hidden when one of
+its direct replies says it was written by AI ("reads like ChatGPT", "written by an LLM", "thanks
+ChatGPT", "the em dashes give it away", "ignore all previous instructions") or, with Bot callouts
+on, calls its author a bot. The reply must pass the same vote rules among its sibling replies, and
+a better-voted "not a bot" or "I wrote this myself" cancels it. Replies under a comment on a
+picture post that only judge the picture ("AI.", "looks like AI") do not count against the
+comment. Judging reruns as more replies load.
+
+Each post carries `data-rab-state` (`seen`, `pending`, `clean`, `ai`, `revealed`, `off`, `error`,
+`queued-offscreen`) and each judged comment `data-rab-comment` (`clean`, `ai`, `revealed`) for
+debugging in DevTools.
 
 ## How it blurs
 
@@ -60,6 +89,13 @@ wrapped whole. The extension only swaps the pill's text, from a `MutationObserve
 component's shadow root so Reddit's "View NSFW content" never paints. Old Reddit has no such
 component, so `content.css` draws a plain overlay over the whole row using the component's
 measured values (40px blur, `rgba(0,0,0,.8)` fill, `.6` scrim, 32px media pill).
+
+A comment is hidden with Reddit's `<shreddit-spoiler>`, one per paragraph (the component is inline,
+so it cannot wrap block paragraphs), and revealing any of them reveals the rest. The badge uses the
+classes Reddit gives user flair in the same row. With "Collapsed", the comment's `<details>` is
+closed, the toggle Reddit's own collapse button flips, so the badge stays visible on the one-line
+row. Old Reddit gets its native `.flair` for the badge and a spoiler bar drawn by `content.css` with
+the component's measured values (`#131313`, 2px corners).
 
 ## Tests
 
@@ -75,7 +111,8 @@ threads and hover-card numbers (unit); the account lookup and when it is skipped
 fetching and fast scrolling; Reddit's blur component (against a stand-in in
 `tests/fixtures/mock-blurred-container.js`) on media and text posts, in the feed and on a post's
 own page; the fallback overlay; click to reveal; caching across reloads, tabs and pages; old
-Reddit; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
+Reddit; comment callouts (unit), and comment spoilers (against `tests/fixtures/mock-spoiler.js`
+and the fallback), badges, collapse and old Reddit comments; the popup's options applying live; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
 end to end, including the cache being cleared (about 30 s, since it waits on the worker's
 reconnect alarm). Setting `RAB_EXT=<dir>` runs the tests against another copy of the extension.
 

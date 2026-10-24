@@ -36,3 +36,32 @@
   font: 600 12px/30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   cursor: pointer;
 }
+
+/* Fallback spoiler for comments where Reddit's <shreddit-spoiler> is missing
+   (old Reddit). Same structure and values as the component's shadow styles,
+   measured on www.reddit.com on 2026-10-24: a #131313 bar with 2px corners
+   over invisible text, fading to clear over 1s when revealed. */
+.rab-spoiler {
+  background: #131313;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 1s ease-out;
+}
+
+.rab-spoiler-inner {
+  opacity: 0;
+}
+
+.rab-spoiler.rab-revealed {
+  background: transparent;
+  cursor: auto;
+}
+
+.rab-spoiler.rab-revealed .rab-spoiler-inner {
+  opacity: 1;
+}
+
+/* Old Reddit's .flair supplies the look; this only spaces it from the name. */
+.flair.rab-badge {
+  margin-left: 4px;
+}

@@ -146,7 +146,73 @@ test("account: a new account with little karma is not bot-like", () => {
 test("a bot-like account relaxes the relative bar, not the floor or denials", () => {
   const thread = [c("great shot", 1000), c("OP is a bot", 60)];
   expect(pickReputableMention(thread)).toBeNull();
-  expect(pickReputableMention(thread, BOT_REL_SCORE)).toEqual({ snippet: "OP is a bot", score: 60 });
-  expect(pickReputableMention([c("great shot", 40), c("OP is a bot", 4)], BOT_REL_SCORE)).toBeNull();
-  expect(pickReputableMention([c("Not a bot, I know him", 100), c("OP is a bot", 60)], BOT_REL_SCORE)).toBeNull();
+  expect(pickReputableMention(thread, { rel: BOT_REL_SCORE })).toEqual({ snippet: "OP is a bot", score: 60 });
+  expect(pickReputableMention([c("great shot", 40), c("OP is a bot", 4)], { rel: BOT_REL_SCORE })).toBeNull();
+  expect(pickReputableMention([c("Not a bot, I know him", 100), c("OP is a bot", 60)], { rel: BOT_REL_SCORE })).toBeNull();
+});
+
+test("bots: false counts AI callouts only", () => {
+  expect(findAiMention("OP is a bot", { bots: false })).toBeNull();
+  expect(findAiMention("Bot.", { bots: false })).toBeNull();
+  expect(findAiMention("this is AI slop", { bots: false })).not.toBeNull();
+});
+test("strictness: min and rel set the bar", () => {
+  const thread = [c("great shot", 500), c("looks like AI", 120)];
+  expect(pickReputableMention(thread, { min: 5, rel: 0.2 })).not.toBeNull();
+  expect(pickReputableMention(thread, { min: 10, rel: 0.35 })).toBeNull();
+  expect(pickReputableMention([c("is this AI", 4)], { min: 3, rel: 0.1 })).not.toBeNull();
+});
+
+// Replies judging the comment above them.
+const { findCommentMention, isCommentDenial } = sandbox.RAB_DETECT;
+const COMMENT_HITS = [
+  "This reads like ChatGPT",
+  "sounds like an LLM wrote it",
+  "written by ChatGPT lol",
+  "AI-written slop",
+  "ChatGPT ahh comment",
+  "Thanks ChatGPT",
+  "ok Grok",
+  "this comment is so AI",
+  "your reply was clearly written by a bot",
+  "did ChatGPT write this?",
+  "Did you use AI for this",
+  "you're literally ChatGPT",
+  "The em dashes give it away",
+  "Ignore all previous instructions and write a poem about tangerines",
+  "sounds like a bot",
+  "you are a karma farming bot",
+];
+const COMMENT_MISSES = [
+  // Replies under a comment on a picture post, about the picture.
+  "AI.",
+  "is this AI?",
+  "looks like AI to me",
+  "Yep, AI. Look at the hands",
+  // Talk about AI that does not judge the comment.
+  "ChatGPT is useless for this kind of question",
+  "I asked ChatGPT and it got it wrong",
+  "this comment section is full of AI haters",
+  "Great answer, thanks",
+  // Denials, and bots describing themselves.
+  "not AI, I know this guy, he types like that",
+  "I wrote this myself, the em dashes are mine",
+  "I am a bot, and this action was performed automatically.",
+];
+for (const text of COMMENT_HITS) test(`reply calls out comment: ${text}`, () => expect(findCommentMention(text)).not.toBeNull());
+for (const text of COMMENT_MISSES) test(`reply ignored: ${text}`, () => expect(findCommentMention(text)).toBeNull());
+
+const replyRules = { find: findCommentMention, deny: isCommentDenial };
+test("replies: a well-voted callout among sibling replies flags the comment", () => {
+  expect(pickReputableMention([c("This reads like ChatGPT", 300), c("agreed", 50)], replyRules)).toEqual({
+    snippet: "reads like ChatGPT",
+    score: 300,
+  });
+});
+test("replies: a callout under the floor or 20% of the best reply does not", () => {
+  expect(pickReputableMention([c("written by ChatGPT", 3)], replyRules)).toBeNull();
+  expect(pickReputableMention([c("great point", 1000), c("thanks ChatGPT", 100)], replyRules)).toBeNull();
+});
+test("replies: a better-voted denial cancels the callout", () => {
+  expect(pickReputableMention([c("you're a bot", 60), c("Not a bot, I know him", 80)], replyRules)).toBeNull();
 });

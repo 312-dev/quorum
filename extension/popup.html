@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reddit AI Blur</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <span class="pill">Potential AI</span>
+    <h1>Reddit AI Blur</h1>
+  </header>
+
+  <section aria-labelledby="hide-h">
+    <h2 id="hide-h">Hide</h2>
+    <label class="row">
+      <span class="text">
+        <span class="name">Posts</span>
+        <span class="hint">Blur the media of posts that comments call out</span>
+      </span>
+      <input type="checkbox" role="switch" name="posts">
+    </label>
+    <label class="row">
+      <span class="text">
+        <span class="name">Comments</span>
+        <span class="hint">Hide comments that replies call out as AI‑written</span>
+      </span>
+      <input type="checkbox" role="switch" name="comments">
+    </label>
+    <div class="row sub" role="radiogroup" aria-label="Comment style" data-group="commentStyle">
+      <span class="name">Hide comments as</span>
+      <span class="seg">
+        <label><input type="radio" name="commentStyle" value="spoiler"><span>Spoiler</span></label>
+        <label><input type="radio" name="commentStyle" value="collapse"><span>Collapsed</span></label>
+      </span>
+    </div>
+  </section>
+
+  <section aria-labelledby="detect-h">
+    <h2 id="detect-h">Detect</h2>
+    <label class="row">
+      <span class="text">
+        <span class="name">Bot callouts</span>
+        <span class="hint">"OP is a bot", karma farming, new farming accounts</span>
+      </span>
+      <input type="checkbox" role="switch" name="bots">
+    </label>
+    <div class="row stack" role="radiogroup" aria-label="Strictness">
+      <span class="name">Strictness</span>
+      <span class="seg wide">
+        <label><input type="radio" name="strictness" value="lenient"><span>Lenient</span></label>
+        <label><input type="radio" name="strictness" value="normal"><span>Normal</span></label>
+        <label><input type="radio" name="strictness" value="strict"><span>Strict</span></label>
+      </span>
+      <span class="hint" id="strictness-hint"></span>
+    </div>
+    <label class="row stack">
+      <span class="line">
+        <span class="name">Wait before checking a post</span>
+        <output id="dwell-out" class="num"></output>
+      </span>
+      <input type="range" name="dwell" min="0" max="5" step="0.5">
+      <span class="hint">Only posts that rest mid-screen this long are fetched</span>
+    </label>
+  </section>
+
+  <footer>
+    <span id="stats" class="num"></span>
+    <button type="button" id="clear">Clear cache</button>
+  </footer>
+
+  <script src="settings.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

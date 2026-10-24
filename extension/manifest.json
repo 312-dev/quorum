@@ -1,17 +1,38 @@
 {
   "manifest_version": 3,
   "name": "Reddit AI Blur",
-  "version": "0.1.0",
-  "description": "Blurs Reddit posts whose comments call them out as AI, behind a click-to-reveal overlay.",
-  "permissions": ["storage", "alarms"],
-  "host_permissions": ["*://www.reddit.com/*", "*://old.reddit.com/*"],
-  "background": { "service_worker": "background.js" },
+  "version": "0.2.0",
+  "description": "Blurs Reddit posts, and hides comments, that other comments call out as AI or bots, behind Reddit's own click-to-reveal blur and spoiler.",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://www.reddit.com/*",
+    "*://old.reddit.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["*://www.reddit.com/*", "*://old.reddit.com/*"],
-      "js": ["detect.js", "content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "*://www.reddit.com/*",
+        "*://old.reddit.com/*"
+      ],
+      "js": [
+        "settings.js",
+        "detect.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "action": {
+    "default_title": "Reddit AI Blur",
+    "default_popup": "popup.html"
+  }
 }
