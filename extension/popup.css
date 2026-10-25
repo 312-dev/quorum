@@ -403,7 +403,7 @@ footer {
   box-shadow: inset 0 0 0 var(--stroke) var(--down);
 }
 
-#ban-error:empty,
+.sub-list .note:empty,
 .chips:empty {
   display: none;
 }

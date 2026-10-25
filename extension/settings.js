@@ -10,6 +10,7 @@
     strictness: "normal", // key of STRICTNESS
     dwell: 2, // seconds a post rests mid-screen before its comments are fetched
     bannedSubs: [], // lowercase subreddit names, without "r/", kept out of feeds
+    exemptSubs: [], // the same, for subreddits never checked or blurred
   };
 
   // How well-voted a callout must be: at least `min` points and `rel` of the

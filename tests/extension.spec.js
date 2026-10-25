@@ -620,11 +620,11 @@ test("popup: posts off lifts the blur, on restores it from cache; strictness re-
 
 test("popup: banned subreddits leave feeds, suggestions and search, live; their pages show a ban screen", async ({ ext }) => {
   const popup = await openPopup(ext);
-  await popup.locator("#ban-input").fill("r/BanMe nope! https://www.reddit.com/r/Other/");
-  await popup.locator("#ban-input").press("Enter");
-  await expect(popup.locator("#bans li")).toHaveText(["r/banme×", "r/other×"]);
-  await expect(popup.locator("#ban-input")).toHaveValue("nope!"); // kept for fixing
-  await expect(popup.locator("#ban-error")).toHaveText("Not a subreddit name: nope!");
+  await popup.locator("form[data-setting=bannedSubs] input").fill("r/BanMe nope! https://www.reddit.com/r/Other/");
+  await popup.locator("form[data-setting=bannedSubs] input").press("Enter");
+  await expect(popup.locator("form[data-setting=bannedSubs] .chips li")).toHaveText(["r/banme×", "r/other×"]);
+  await expect(popup.locator("form[data-setting=bannedSubs] input")).toHaveValue("nope!"); // kept for fixing
+  await expect(popup.locator("form[data-setting=bannedSubs] .note")).toHaveText("Not a subreddit name: nope!");
 
   const page = await ext.context.newPage();
   await page.goto("https://www.reddit.com/r/popular/");
@@ -644,13 +644,13 @@ test("popup: banned subreddits leave feeds, suggestions and search, live; their 
 
   // Unbanning brings everything back in the open tab.
   await popup.getByRole("button", { name: "Unban r/banme" }).click();
-  await expect(popup.locator("#bans li")).toHaveText(["r/other×"]);
+  await expect(popup.locator("form[data-setting=bannedSubs] .chips li")).toHaveText(["r/other×"]);
   for (const sel of [...hidden, "#late"]) await expect(page.locator(sel)).toBeVisible();
 
   // The subreddit's own pages get Reddit's ban screen, with the URL's
   // spelling; unbanning from it lifts it and the hidden listings.
-  await popup.locator("#ban-input").fill("banme");
-  await popup.locator("#ban-input").press("Enter");
+  await popup.locator("form[data-setting=bannedSubs] input").fill("banme");
+  await popup.locator("form[data-setting=bannedSubs] input").press("Enter");
   await expect(page.locator("#late")).toBeHidden();
   await expect(page.locator(".rab-gate")).toHaveCount(0); // r/popular is not banned
   const own = await ext.context.newPage();
@@ -662,11 +662,11 @@ test("popup: banned subreddits leave feeds, suggestions and search, live; their 
   await modal.getByRole("button", { name: "Unban" }).click();
   await expect(modal).toHaveCount(0);
   await expect(own.locator("article:has(#t3_bp1)")).toBeVisible();
-  await expect(popup.locator("#bans li")).toHaveText(["r/other×"]);
+  await expect(popup.locator("form[data-setting=bannedSubs] .chips li")).toHaveText(["r/other×"]);
   expect(await own.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe("hidden");
 
-  await popup.locator("#ban-input").fill("banme");
-  await popup.locator("#ban-input").press("Enter");
+  await popup.locator("form[data-setting=bannedSubs] input").fill("banme");
+  await popup.locator("form[data-setting=bannedSubs] input").press("Enter");
   // A post page under it is covered too.
   await own.goto("https://www.reddit.com/r/banme/comments/ai1/x/");
   await expect(own.getByRole("dialog", { name: "r/banme is banned" })).toBeVisible();
@@ -675,4 +675,39 @@ test("popup: banned subreddits leave feeds, suggestions and search, live; their 
   await old.goto("https://old.reddit.com/r/test/");
   await expect(old.locator('[data-fullname="t3_oldban"]')).toBeHidden();
   await expect(old.locator('[data-fullname="t3_oldclean"]')).toBeVisible();
+});
+
+test("popup: excluded subreddits are never checked, blurred or hidden, live", async ({ ext }) => {
+  const popup = await openPopup(ext);
+  const form = popup.locator("form[data-setting=exemptSubs]");
+  await expect(form.locator(".chips li")).toHaveCount(0); // none by default
+  await form.locator("input").fill("r/Test");
+  await form.locator("input").press("Enter");
+  await expect(form.locator(".chips li")).toHaveText(["r/test×"]);
+
+  const page = await ext.context.newPage();
+  await page.goto("https://www.reddit.com/r/test/");
+  await expect.poll(() => state(page, "ai1")).toBe("exempt");
+  await page.waitForTimeout(3000); // past the dwell
+  expect(ext.fetched).not.toContain("ai1");
+  await expect(page.locator(".rab-overlay")).toHaveCount(0);
+
+  const thread = await ext.context.newPage();
+  await thread.goto("https://www.reddit.com/r/test/comments/thread1/x/");
+  await thread.waitForTimeout(1000);
+  expect(await commentState(thread, "c1")).toBeNull();
+  await expect(thread.locator(".rab-badge")).toHaveCount(0);
+
+  // Lifting the exclusion checks and hides them again, without a reload.
+  await form.getByRole("button", { name: "Unexclude r/test" }).click();
+  await expect(form.locator(".chips li")).toHaveCount(0);
+  await expect.poll(() => state(page, "ai1")).toBe("ai");
+  await expect.poll(() => commentState(thread, "c1")).toBe("ai");
+
+  // And excluding again lifts a blur and a hidden comment already shown.
+  await form.locator("input").fill("test");
+  await form.locator("input").press("Enter");
+  await expect.poll(() => state(page, "ai1")).toBe("exempt");
+  await expect(page.locator(".rab-overlay")).toHaveCount(0);
+  await expect.poll(() => commentState(thread, "c1")).toBeNull();
 });

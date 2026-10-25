@@ -28,24 +28,30 @@ function show() {
   document.getElementById("strictness-hint").innerHTML =
     `Needs <b>+${min}</b> and ${Math.round(rel * 100)}% of the top comment`;
   document.querySelector("[data-group='commentStyle']").classList.toggle("off", !settings.comments);
-  showBans();
+  showSubLists();
 }
 
-function showBans() {
-  const list = document.getElementById("bans");
-  list.replaceChildren(
-    ...settings.bannedSubs.map((sub) => {
-      const li = document.createElement("li");
-      li.textContent = `r/${sub}`;
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.textContent = "×";
-      remove.setAttribute("aria-label", `Unban r/${sub}`);
-      remove.addEventListener("click", () => save("bannedSubs", settings.bannedSubs.filter((s) => s !== sub)));
-      li.append(remove);
-      return li;
-    })
-  );
+// The subreddit lists (banned, excluded): one form each, naming its setting
+// and its verb ("Ban" gives "Unban r/x" on the chip's remove button).
+const subLists = [...document.querySelectorAll("form.sub-list")];
+
+function showSubLists() {
+  for (const form of subLists) {
+    const key = form.dataset.setting;
+    form.querySelector(".chips").replaceChildren(
+      ...settings[key].map((sub) => {
+        const li = document.createElement("li");
+        li.textContent = `r/${sub}`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Un${form.dataset.verb.toLowerCase()} r/${sub}`);
+        remove.addEventListener("click", () => save(key, settings[key].filter((s) => s !== sub)));
+        li.append(remove);
+        return li;
+      })
+    );
+  }
 }
 
 function showDwell(value) {
@@ -91,20 +97,23 @@ document.body.addEventListener("change", (e) => {
   save(input.name, input.type === "range" ? +input.value : input.value);
 });
 
-// Takes one or more names, links or "r/" forms, split by spaces or commas.
-// Anything that is not a subreddit stays in the field with an error.
-document.getElementById("ban-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const input = document.getElementById("ban-input");
-  const parts = input.value.split(/[\s,]+/).filter(Boolean);
-  const names = parts.map(subName);
-  const bad = parts.filter((_, i) => !names[i]);
-  input.value = bad.join(" ");
-  document.getElementById("ban-error").textContent = bad.length ? `Not a subreddit name: ${bad[0]}` : "";
-  const next = [...new Set([...settings.bannedSubs, ...names.filter(Boolean)])].sort();
-  if (next.length !== settings.bannedSubs.length) save("bannedSubs", next);
-  input.focus();
-});
+// Each takes one or more names, links or "r/" forms, split by spaces or
+// commas. Anything that is not a subreddit stays in the field with an error.
+for (const form of subLists) {
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const key = form.dataset.setting;
+    const input = form.querySelector("input");
+    const parts = input.value.split(/[\s,]+/).filter(Boolean);
+    const names = parts.map(subName);
+    const bad = parts.filter((_, i) => !names[i]);
+    input.value = bad.join(" ");
+    form.querySelector(".note").textContent = bad.length ? `Not a subreddit name: ${bad[0]}` : "";
+    const next = [...new Set([...settings[key], ...names.filter(Boolean)])].sort();
+    if (next.length !== settings[key].length) save(key, next);
+    input.focus();
+  });
+}
 
 // The slider's readout and run follow the thumb; the setting is saved on release.
 document.querySelector("input[name='dwell']").addEventListener("input", (e) => showDwell(e.target.value));

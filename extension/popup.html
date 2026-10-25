@@ -70,19 +70,31 @@
     </label>
   </section>
 
-  <section aria-labelledby="ban-h">
-    <h2 id="ban-h">Ban</h2>
-    <form class="row stack" id="ban-form" novalidate>
+  <section aria-labelledby="subs-h">
+    <h2 id="subs-h">Subreddits</h2>
+    <form class="row stack sub-list" data-setting="bannedSubs" data-verb="Ban" novalidate>
       <span class="text">
-        <span class="name">Subreddits</span>
+        <span class="name">Banned</span>
         <span class="hint">Kept out of feeds, search and suggestions, and shown as banned if you visit</span>
       </span>
       <span class="add">
-        <label class="field"><span aria-hidden="true">r/</span><input id="ban-input" type="text" placeholder="subreddit" aria-label="Subreddit to ban" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span aria-hidden="true">r/</span><input type="text" placeholder="subreddit" aria-label="Subreddit to ban" autocomplete="off" spellcheck="false"></label>
         <button type="submit" class="btn">Ban</button>
       </span>
-      <span class="note" id="ban-error" role="status"></span>
-      <ul class="chips" id="bans" aria-label="Banned subreddits"></ul>
+      <span class="note" role="status"></span>
+      <ul class="chips" aria-label="Banned subreddits"></ul>
+    </form>
+    <form class="row stack sub-list" data-setting="exemptSubs" data-verb="Exclude" novalidate>
+      <span class="text">
+        <span class="name">Excluded</span>
+        <span class="hint">Never checked or blurred, such as r/isthisAI, where every post asks</span>
+      </span>
+      <span class="add">
+        <label class="field"><span aria-hidden="true">r/</span><input type="text" placeholder="subreddit" aria-label="Subreddit to exclude" autocomplete="off" spellcheck="false"></label>
+        <button type="submit" class="btn">Exclude</button>
+      </span>
+      <span class="note" role="status"></span>
+      <ul class="chips" aria-label="Excluded subreddits"></ul>
     </form>
   </section>
 

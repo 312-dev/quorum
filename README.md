@@ -30,6 +30,7 @@ profile (`chrome.storage.sync`, defaults in `extension/settings.js`):
 | Strictness | Normal | Lenient: 3 points and 10% of the top comment; Normal: 5 and 20%; Strict: 10 and 35% |
 | Wait before checking a post | 2 s | The dwell below; 0 to 5 s |
 | Ban subreddits | none | Type names, `r/` names or links, separated by spaces or commas; remove with a chip's × |
+| Exclude subreddits | none | Same input; posts from these are never checked or blurred, and comments on their pages never hidden |
 
 Changing Bot callouts or Strictness clears the cached verdicts so posts are judged again. The panel
 also shows how many cached posts are flagged and clears the cache (verdicts and accounts).
@@ -44,6 +45,13 @@ the modal Reddit shows on a subreddit it has banned (`<guard-community-modal>`, 
 loads on such pages), with its blurred backdrop and light and dark colours, saying the ban is
 yours, and an Unban button beside Browse Other Communities. `BAN_UNITS` in `content.js` lists
 the units; the modal's measurements are in `content.css`.
+
+## Excluded subreddits
+
+An excluded subreddit is left alone: its posts are never fetched or blurred wherever they are
+listed (`data-rab-state="exempt"`), and comments on its post pages are never hidden. It is for
+subreddits where callouts are the point, such as r/isthisAI, where every post asks whether it is AI
+and the answers would blur the lot. Adding or removing one applies at once in open tabs.
 
 ## How it decides
 
@@ -160,7 +168,7 @@ fetching and fast scrolling; Reddit's blur component (against a stand-in in
 own page; the fallback overlay; click to reveal; caching across reloads, tabs and pages; old
 Reddit's stamp, blurred thumbnail and media, and thumbnail click; comment callouts (unit), and
 comment spoilers (against `tests/fixtures/mock-spoiler.js` and the fallback), badges, collapse and
-old Reddit comments with its own spoiler; the popup's options applying live; banned subreddits across every listing unit and the ban screen; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
+old Reddit comments with its own spoiler; the popup's options applying live; banned subreddits across every listing unit and the ban screen; excluded subreddits on posts and comments, live; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
 end to end, including the cache being cleared (about 30 s, since it waits on the worker's
 reconnect alarm). Setting `RAB_EXT=<dir>` runs the tests against another copy of the extension; `RAB_EXT=$PWD/dist/build npx playwright test --grep-invert "hot reload"` checks the store build.
 

@@ -24,7 +24,7 @@ Everything below stays on your device in Chrome's extension storage:
 |---|---|---|
 | Post IDs with the verdict, the deciding comment's score and a short quote of it | so a post is not checked again on every visit | 7 days for flagged posts, 1 hour for clean ones |
 | Author account age and karma | so an author's profile card is not fetched repeatedly | 7 days |
-| Your options (on/off switches, strictness, wait time, banned subreddits) | to remember your choices | until you change them |
+| Your options (on/off switches, strictness, wait time, banned and excluded subreddits) | to remember your choices | until you change them |
 
 Your options are saved with `chrome.storage.sync`, so if you use Chrome Sync, Google syncs them
 between your own browsers like any other extension setting. Nothing else is synced.

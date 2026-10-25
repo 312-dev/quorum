@@ -44,6 +44,7 @@ Everything the developer dashboard asks for, ready to paste. Build the upload wi
     • How long a post must stay on screen before it's checked, so fast scrolling costs nothing
     • Ban subreddits: their posts and suggestions vanish from feeds, search and the sidebar, and
       visiting one shows a ban screen
+    • Exclude subreddits, such as r/isthisAI, where every post asks and nothing should be blurred
 
     PRIVATE BY DESIGN
     Everything runs in your browser. No account, no server, no analytics. Quorum reads Reddit's

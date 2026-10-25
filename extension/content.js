@@ -5,7 +5,8 @@
 // chrome.storage.local so a post is fetched at most once per TTL across every
 // tab. On a comments page, a comment whose replies call it out as AI-written
 // is hidden behind Reddit's spoiler (or collapsed) and badged "Potential AI".
-// Posts and suggestions from banned subreddits are removed from listings.
+// Posts and suggestions from banned subreddits are removed from listings;
+// excluded subreddits are never checked.
 // Options come from the toolbar popup (settings.js) and apply live.
 (() => {
   const { pickReputableMention, findAiMention, findCommentMention, isCommentDenial, isBotLikeAccount, BOT_REL_SCORE } =
@@ -113,14 +114,15 @@
     const prev = settings;
     settings = { ...DEFAULTS, ...changes.settings.newValue };
     const changed = (k) => prev[k] !== settings[k];
-    if (["posts", ...RULE_KEYS].some(changed)) {
+    const exemptChanged = prev.exemptSubs.join() !== settings.exemptSubs.join();
+    if (exemptChanged || ["posts", ...RULE_KEYS].some(changed)) {
       for (const id of [...undos.keys()]) unflag(id);
       for (const id of els.keys()) {
         if (focused.has(id)) check(id);
         else showCached(id);
       }
     }
-    if (["comments", "commentStyle", ...RULE_KEYS].some(changed)) {
+    if (exemptChanged || ["comments", "commentStyle", ...RULE_KEYS].some(changed)) {
       for (const id of [...commentUndos.keys()]) unhideComment(id);
       judged.clear();
       scanComments();
@@ -143,6 +145,10 @@
     if (!el) return true;
     if (!settings.posts) {
       setState(id, "off");
+      return true;
+    }
+    if (isExempt(el)) {
+      setState(id, "exempt");
       return true;
     }
     const { comments } = postInfo(el);
@@ -324,6 +330,7 @@
     const entry = mem.get(id);
     if (!el || !entry) return;
     if (!settings.posts) return setState(id, "off");
+    if (isExempt(el)) return setState(id, "exempt");
     if (!entry.v) return setState(id, "clean");
     if (revealed.has(id)) return setState(id, "revealed");
     setState(id, "ai");
@@ -547,7 +554,7 @@
 
   async function scanComments() {
     await ready;
-    if (!settings.comments) return;
+    if (!settings.comments || settings.exemptSubs.includes(subName(location.pathname))) return;
     const all = document.querySelectorAll(C_SELECTOR);
     const replies = new Map();
     for (const el of all) {
@@ -724,6 +731,10 @@
     if (named) return subName(named);
     return subName(el.getAttribute("permalink") || el.querySelector("a[href*='/r/']")?.getAttribute("href"));
   }
+
+  // Excluded subreddits: their posts are never fetched or blurred, wherever
+  // they are listed, and comments on their pages are never hidden.
+  const isExempt = (el) => settings.exemptSubs.length > 0 && settings.exemptSubs.includes(subOf(el));
 
   async function hideBanned() {
     await ready;
