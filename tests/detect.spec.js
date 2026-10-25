@@ -156,7 +156,7 @@ test("bots: false counts AI callouts only", () => {
   expect(findAiMention("Bot.", { bots: false })).toBeNull();
   expect(findAiMention("this is AI slop", { bots: false })).not.toBeNull();
 });
-test("strictness: min and rel set the bar", () => {
+test("sensitivity: min and rel set the bar", () => {
   const thread = [c("great shot", 500), c("looks like AI", 120)];
   expect(pickReputableMention(thread, { min: 5, rel: 0.2 })).not.toBeNull();
   expect(pickReputableMention(thread, { min: 10, rel: 0.35 })).toBeNull();

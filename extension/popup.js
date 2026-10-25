@@ -1,7 +1,7 @@
 // The toolbar popup: reads and writes the settings in chrome.storage.sync
 // (every open Reddit tab applies a change at once), tallies the cached post
 // verdicts, and clears them.
-const { STRICTNESS, RULE_KEYS, loadSettings, subName } = globalThis.RAB_SETTINGS;
+const { SENSITIVITY, RULE_KEYS, loadSettings, subName } = globalThis.RAB_SETTINGS;
 let settings;
 
 // Reddit-weight arrows for the vote switch: a wide head on a short stem.
@@ -24,9 +24,9 @@ function show() {
     else input.value = settings[input.name];
   }
   showDwell(settings.dwell);
-  const { min, rel } = STRICTNESS[settings.strictness];
-  document.getElementById("strictness-hint").innerHTML =
-    `Needs <b>+${min}</b> and ${Math.round(rel * 100)}% of the top comment`;
+  const { min, rel } = SENSITIVITY[settings.sensitivity];
+  document.getElementById("sensitivity-hint").innerHTML =
+    `Flags once a callout has <b>+${min}</b> and ${Math.round(rel * 100)}% of the top comment's votes`;
   document.querySelector("[data-group='commentStyle']").classList.toggle("off", !settings.comments);
   showSubLists();
 }

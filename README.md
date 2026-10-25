@@ -27,12 +27,12 @@ profile (`chrome.storage.sync`, defaults in `extension/settings.js`):
 | Comments | on | Hide comments that replies call out |
 | Hide comments as | Spoiler | Spoiler, or Reddit's own collapse |
 | Bot callouts | on | Count bot and karma-farming callouts and the account check, not just AI ones |
-| Strictness | Normal | Lenient: 3 points and 10% of the top comment; Normal: 5 and 20%; Strict: 10 and 35% |
+| Sensitivity | Normal | How readily a callout flags; higher filters more. Low: 10 points and 35% of the top comment; Normal: 5 and 20%; High: 3 and 10% |
 | Wait before checking a post | 2 s | The dwell below; 0 to 5 s |
 | Ban subreddits | none | Type names, `r/` names or links, separated by spaces or commas; remove with a chip's × |
 | Exclude subreddits | none | Same input; posts from these are never checked or blurred, and comments on their pages never hidden |
 
-Changing Bot callouts or Strictness clears the cached verdicts so posts are judged again. The panel
+Changing Bot callouts or Sensitivity clears the cached verdicts so posts are judged again. The panel
 also shows how many cached posts are flagged and clears the cache (verdicts and accounts).
 
 ## Banned subreddits
@@ -66,7 +66,7 @@ and the answers would blur the lot. Adding or removing one applies at once in op
 - A comment counts only if it matches a phrase in `extension/detect.js` ("is this AI", "AI slop",
   "looks like AI", "done with AI", or a reply that opens with the verdict, like "AI, look at the
   hands") **and** is reputable: not marked controversial, score visible, at least 5 points and at
-  least 20% of the thread's top comment (Normal strictness; `STRICTNESS` in `settings.js`). The HTML partial reports
+  least 20% of the thread's top comment (Normal sensitivity; `SENSITIVITY` in `settings.js`). The HTML partial reports
   hidden scores as 1, so those never qualify.
 - Bot callouts count the same way: "OP is a bot", "you are a karma farming bot", "this is a bot
   account", or a reply opening with "Bot." or "Karma farming.". Remarks about bots in general ("95%

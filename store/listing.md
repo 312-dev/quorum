@@ -40,7 +40,7 @@ Everything the developer dashboard asks for, ready to paste. Build the upload wi
     YOU SET THE BAR
     • Turn post blurring and comment hiding on or off
     • Spoiler or collapse for hidden comments
-    • Lenient, normal or strict vote thresholds
+    • Low, normal or high sensitivity: how many votes a callout needs before it counts
     • How long a post must stay on screen before it's checked, so fast scrolling costs nothing
     • Ban subreddits: their posts and suggestions vanish from feeds, search and the sidebar, and
       visiting one shows a ban screen

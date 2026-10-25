@@ -606,7 +606,7 @@ test("old reddit comments get the flair badge and old reddit's own spoiler", asy
   expect(await commentState(page, "c1")).toBe("revealed");
 });
 
-test("popup: posts off lifts the blur, on restores it from cache; strictness re-judges", async ({ ext }) => {
+test("popup: posts off lifts the blur, on restores it from cache; sensitivity re-judges", async ({ ext }) => {
   const page = await ext.context.newPage();
   await page.goto("https://www.reddit.com/r/test/");
   await expect.poll(() => state(page, "ai1")).toBe("ai");
@@ -633,9 +633,9 @@ test("popup: posts off lifts the blur, on restores it from cache; strictness re-
   await expect.poll(() => state(page, "ai1")).toBe("ai");
   expect(ext.fetched.length).toBe(before);
 
-  // Strict needs 35% of the top comment: lowvote's +120 against +500 fails.
-  await popup.getByText("Strict", { exact: true }).click();
-  await expect(popup.locator("#strictness-hint")).toHaveText("Needs +10 and 35% of the top comment");
+  // Low sensitivity needs 35% of the top comment: lowvote's +120 against +500 fails.
+  await popup.getByText("Low", { exact: true }).click();
+  await expect(popup.locator("#sensitivity-hint")).toHaveText("Flags once a callout has +10 and 35% of the top comment's votes");
   await expect.poll(() => state(page, "lowvote")).toBe("clean");
   expect(ext.fetched.length).toBeGreaterThan(before);
 

@@ -7,23 +7,24 @@
     comments: true, // hide comments that replies call out
     commentStyle: "spoiler", // "spoiler" or "collapse"
     bots: true, // count bot and karma-farming callouts, not just AI ones
-    strictness: "normal", // key of STRICTNESS
+    sensitivity: "normal", // key of SENSITIVITY
     dwell: 2, // seconds a post rests mid-screen before its comments are fetched
     bannedSubs: [], // lowercase subreddit names, without "r/", kept out of feeds
     exemptSubs: [], // the same, for subreddits never checked or blurred
   };
 
   // How well-voted a callout must be: at least `min` points and `rel` of the
-  // best comment it is compared with.
-  const STRICTNESS = {
-    lenient: { min: 3, rel: 0.1 },
+  // best comment it is compared with. Higher sensitivity is a lower bar, so
+  // more is filtered.
+  const SENSITIVITY = {
+    low: { min: 10, rel: 0.35 },
     normal: { min: 5, rel: 0.2 },
-    strict: { min: 10, rel: 0.35 },
+    high: { min: 3, rel: 0.1 },
   };
 
   // Settings that change which posts are flagged; changing one clears the
   // cached post verdicts.
-  const RULE_KEYS = ["bots", "strictness"];
+  const RULE_KEYS = ["bots", "sensitivity"];
 
   async function loadSettings() {
     const { settings } = await chrome.storage.sync.get("settings");
@@ -38,5 +39,5 @@
     return m ? m[1].toLowerCase() : null;
   }
 
-  root.RAB_SETTINGS = { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings, subName };
+  root.RAB_SETTINGS = { DEFAULTS, SENSITIVITY, RULE_KEYS, loadSettings, subName };
 })(globalThis);

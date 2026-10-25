@@ -11,7 +11,7 @@
 (() => {
   const { pickReputableMention, findAiMention, findCommentMention, isCommentDenial, isBotLikeAccount, BOT_REL_SCORE } =
     globalThis.RAB_DETECT;
-  const { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings, subName } = globalThis.RAB_SETTINGS;
+  const { DEFAULTS, SENSITIVITY, RULE_KEYS, loadSettings, subName } = globalThis.RAB_SETTINGS;
   let settings = { ...DEFAULTS };
 
   const IS_OLD = location.hostname.startsWith("old.");
@@ -88,7 +88,7 @@
   const ready = Promise.all([cacheReady, loadSettings().then((s) => (settings = s))]);
 
   // The vote bar and phrase test for posts under the current settings.
-  const postRules = () => ({ ...STRICTNESS[settings.strictness], find: (t) => findAiMention(t, settings) });
+  const postRules = () => ({ ...SENSITIVITY[settings.sensitivity], find: (t) => findAiMention(t, settings) });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
@@ -565,7 +565,7 @@
       replies.get(parent).push(el);
     }
     const rules = {
-      ...STRICTNESS[settings.strictness],
+      ...SENSITIVITY[settings.sensitivity],
       find: (t) => findCommentMention(t, settings),
       deny: isCommentDenial,
     };
