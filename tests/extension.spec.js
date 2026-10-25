@@ -334,6 +334,33 @@ test("works on old reddit", async ({ ext }) => {
   await expect(stamp).toHaveText("POTENTIAL AI");
 });
 
+// Reddit Enhancement Suite opens media in its own .res-expando-box beside the
+// entry's content, and night mode puts .res-nightmode on <html> and <body>
+// (both measured with RES 5.24.11 loaded).
+test("old reddit with RES: its media box is blurred and night mode gets a readable stamp", async ({ ext }) => {
+  const page = await ext.context.newPage();
+  await page.goto("https://old.reddit.com/r/test/");
+  await expect.poll(() => state(page, "oldai")).toBe("ai");
+  const ai = post(page, "oldai");
+  const stamp = ai.locator(".rab-stamp");
+  const color = () => stamp.evaluate((e) => getComputedStyle(e).color);
+  expect(await color()).toBe("rgb(91, 98, 201)");
+  await page.evaluate(() => {
+    document.documentElement.classList.add("res-nightmode");
+    document.body.classList.add("res-nightmode");
+    const box = document.createElement("div");
+    box.className = "res-expando-box";
+    box.innerHTML = '<div class="res-media-independent"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="200" height="100" alt=""></div>';
+    document.querySelector("#thing_t3_oldai > .entry").append(box);
+  });
+  expect(await color()).toBe("rgb(154, 160, 240)");
+  const media = ai.locator(".res-expando-box > .res-media-independent");
+  expect(await media.evaluate((e) => getComputedStyle(e).filter)).toContain("blur");
+  await ai.locator(".res-expando-box").click();
+  await expect.poll(() => state(page, "oldai")).toBe("revealed");
+  expect(await media.evaluate((e) => getComputedStyle(e).filter)).toBe("none");
+});
+
 test("uses Reddit's own blur component when the page defines it", async ({ ext }) => {
   ext.redditBlur = true;
   const page = await ext.context.newPage();

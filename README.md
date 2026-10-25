@@ -118,7 +118,9 @@ and media that stays shut on its own page. So its blur is made of those parts. A
 a blurred thumbnail always means flagged), and a click on it opens the media instead of following
 the link. Opened media or text is blurred under a stamp-styled "click to show" label, and one click
 lifts the blur from it and the thumbnail. Reddit rebuilds the expando whenever it opens, so the blur
-hangs off a class on the post rather than off nodes inside it.
+hangs off a class on the post rather than off nodes inside it. With Reddit Enhancement Suite, media
+opens in its `.res-expando-box` instead, which is blurred the same way, and RES night mode
+(`.res-nightmode`) gets a lighter periwinkle for the stamp and label (checked with RES 5.24.11).
 
 A comment is hidden with Reddit's `<shreddit-spoiler>`, one per paragraph (the component is inline,
 so it cannot wrap block paragraphs), and revealing any of them reveals the rest. The badge uses the
@@ -166,7 +168,8 @@ threads and hover-card numbers (unit); the account lookup and when it is skipped
 fetching and fast scrolling; Reddit's blur component (against a stand-in in
 `tests/fixtures/mock-blurred-container.js`) on media and text posts, in the feed and on a post's
 own page; the fallback overlay; click to reveal; caching across reloads, tabs and pages; old
-Reddit's stamp, blurred thumbnail and media, and thumbnail click; comment callouts (unit), and
+Reddit's stamp, blurred thumbnail and media, and thumbnail click, including RES's media box and night
+mode; comment callouts (unit), and
 comment spoilers (against `tests/fixtures/mock-spoiler.js` and the fallback), badges, collapse and
 old Reddit comments with its own spoiler; the popup's options applying live; banned subreddits across every listing unit and the ban screen; excluded subreddits on posts and comments, live; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
 end to end, including the cache being cleared (about 30 s, since it waits on the worker's

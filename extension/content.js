@@ -478,8 +478,9 @@
   // This blur is built from those parts: a stamp in the post's button row, the
   // thumbnail blurred, and the opened media or text blurred under a
   // stamp-styled label until clicked. Reddit rebuilds the expando each time it
-  // opens, so the blur hangs off a class on the post (content.css), never off
-  // nodes inside the expando.
+  // opens (and Reddit Enhancement Suite swaps in its own .res-expando-box), so
+  // the blur hangs off a class on the post (content.css), never off nodes
+  // inside the media box.
   function blurOld(id, el, title) {
     el.classList.add("rab-old-flagged");
     const li = document.createElement("li");
@@ -494,7 +495,7 @@
       el.removeEventListener("click", onClick, true);
     };
     const onClick = (e) => {
-      const expando = e.target.closest(".expando");
+      const expando = e.target.closest(".expando, .res-expando-box");
       if (expando && el.contains(expando)) {
         e.preventDefault();
         e.stopPropagation();

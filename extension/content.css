@@ -41,9 +41,16 @@
    blurOld): its .stamp, here periwinkle, in the button row; the thumbnail
    blurred, sprite icons included, so a blurred thumbnail always means
    flagged; and the opened media or text blurred under a stamp-styled label in
-   old Reddit's 10px Verdana. */
+   old Reddit's 10px Verdana. Media opens in Reddit's .expando, or in
+   .res-expando-box where Reddit Enhancement Suite replaces it. RES night
+   mode (.res-nightmode, a #262626 page) gets a lighter periwinkle, 6.2:1
+   against the 2.9:1 the day colour would give. */
 .rab-stamp {
   color: #5b62c9;
+}
+
+.res-nightmode .rab-stamp {
+  color: #9aa0f0;
 }
 
 .rab-old-flagged > a.thumbnail {
@@ -59,20 +66,20 @@
   filter: blur(3px);
 }
 
-.rab-old-flagged > .entry .expando {
+.rab-old-flagged > .entry :is(.expando, .res-expando-box) {
   position: relative;
   overflow: hidden;
   min-height: 60px;
   cursor: pointer;
 }
 
-.rab-old-flagged > .entry .expando > * {
+.rab-old-flagged > .entry :is(.expando, .res-expando-box) > * {
   filter: blur(24px);
   pointer-events: none;
   user-select: none;
 }
 
-.rab-old-flagged > .entry .expando::after {
+.rab-old-flagged > .entry :is(.expando, .res-expando-box)::after {
   content: "POTENTIAL AI \00b7  click to show";
   position: absolute;
   top: 50%;
@@ -85,6 +92,12 @@
   color: #5b62c9;
   font: bold 10px/16px verdana, arial, helvetica, sans-serif;
   white-space: nowrap;
+}
+
+.res-nightmode .rab-old-flagged > .entry :is(.expando, .res-expando-box)::after {
+  border-color: #9aa0f0;
+  background: #262626;
+  color: #9aa0f0;
 }
 
 /* Fallback spoiler for New Reddit comments where its <shreddit-spoiler> is
