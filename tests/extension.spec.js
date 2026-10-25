@@ -100,7 +100,13 @@ async function launch(extDir) {
     let body;
     if (url.pathname.includes("/comments/thread1/")) body = (old ? oldThreadHtml : threadHtml)(THREAD);
     else {
-      const page = old ? "old.html" : url.pathname.includes("/comments/") ? "post.html" : "feed.html";
+      const page = old
+        ? "old.html"
+        : url.pathname.includes("/comments/")
+          ? "post.html"
+          : /^\/(r\/popular|r\/banme)\//i.test(url.pathname)
+            ? "popular.html"
+            : "feed.html";
       body = readFileSync(join(FIXTURES, page), "utf8");
     }
     const mocks = [ext.redditBlur && "mock-blurred-container.js", ext.redditSpoiler && "mock-spoiler.js"].filter(Boolean);
@@ -581,4 +587,63 @@ test("popup: posts off lifts the blur, on restores it from cache; strictness re-
   await expect(popup.locator("#flagged")).toHaveText("0");
   await expect(popup.locator("#checked")).toHaveText("0");
   await expect(popup.locator("#clear")).toHaveText("Cache cleared");
+});
+
+test("popup: banned subreddits leave feeds, suggestions and search, live; their pages show a ban screen", async ({ ext }) => {
+  const popup = await openPopup(ext);
+  await popup.locator("#ban-input").fill("r/BanMe nope! https://www.reddit.com/r/Other/");
+  await popup.locator("#ban-input").press("Enter");
+  await expect(popup.locator("#bans li")).toHaveText(["r/banme×", "r/other×"]);
+  await expect(popup.locator("#ban-input")).toHaveValue("nope!"); // kept for fixing
+  await expect(popup.locator("#ban-error")).toHaveText("Not a subreddit name: nope!");
+
+  const page = await ext.context.newPage();
+  await page.goto("https://www.reddit.com/r/popular/");
+  const hidden = ["article:has(#t3_bp1)", "#hr-bp1", "#card-ban", "#rail-ban", "#search-ban", "#hr-search-ban", "#community-ban"];
+  const shown = ["article:has(#t3_kp1)", "#hr-kp1", "#card-keep", "#rail-keep", "#search-keep"];
+  for (const sel of hidden) await expect(page.locator(sel)).toBeHidden();
+  for (const sel of shown) await expect(page.locator(sel)).toBeVisible();
+  // A banned post is never fetched, though it sat mid-screen past the dwell.
+  await page.waitForTimeout(2500);
+  expect(ext.fetched).not.toContain("bp1");
+
+  // Infinite scroll's later posts are caught too.
+  await page.evaluate(() =>
+    document.getElementById("feed").insertAdjacentHTML("beforeend",
+      '<article id="late"><shreddit-post id="t3_bp2" subreddit-name="banme" comment-count="0"></shreddit-post></article>'));
+  await expect(page.locator("#late")).toBeHidden();
+
+  // Unbanning brings everything back in the open tab.
+  await popup.getByRole("button", { name: "Unban r/banme" }).click();
+  await expect(popup.locator("#bans li")).toHaveText(["r/other×"]);
+  for (const sel of [...hidden, "#late"]) await expect(page.locator(sel)).toBeVisible();
+
+  // The subreddit's own pages get Reddit's ban screen, with the URL's
+  // spelling; unbanning from it lifts it and the hidden listings.
+  await popup.locator("#ban-input").fill("banme");
+  await popup.locator("#ban-input").press("Enter");
+  await expect(page.locator("#late")).toBeHidden();
+  await expect(page.locator(".rab-gate")).toHaveCount(0); // r/popular is not banned
+  const own = await ext.context.newPage();
+  await own.goto("https://www.reddit.com/r/BanMe/");
+  const modal = own.getByRole("dialog", { name: "r/BanMe is banned" });
+  await expect(modal).toBeVisible();
+  await expect(modal.getByRole("link", { name: "Browse Other Communities" })).toHaveAttribute("href", "/r/popular");
+  expect(await own.evaluate(() => getComputedStyle(document.body).overflow)).toBe("hidden");
+  await modal.getByRole("button", { name: "Unban" }).click();
+  await expect(modal).toHaveCount(0);
+  await expect(own.locator("article:has(#t3_bp1)")).toBeVisible();
+  await expect(popup.locator("#bans li")).toHaveText(["r/other×"]);
+  expect(await own.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe("hidden");
+
+  await popup.locator("#ban-input").fill("banme");
+  await popup.locator("#ban-input").press("Enter");
+  // A post page under it is covered too.
+  await own.goto("https://www.reddit.com/r/banme/comments/ai1/x/");
+  await expect(own.getByRole("dialog", { name: "r/banme is banned" })).toBeVisible();
+
+  const old = await ext.context.newPage();
+  await old.goto("https://old.reddit.com/r/test/");
+  await expect(old.locator('[data-fullname="t3_oldban"]')).toBeHidden();
+  await expect(old.locator('[data-fullname="t3_oldclean"]')).toBeVisible();
 });

@@ -5,11 +5,12 @@
 // chrome.storage.local so a post is fetched at most once per TTL across every
 // tab. On a comments page, a comment whose replies call it out as AI-written
 // is hidden behind Reddit's spoiler (or collapsed) and badged "Potential AI".
+// Posts and suggestions from banned subreddits are removed from listings.
 // Options come from the toolbar popup (settings.js) and apply live.
 (() => {
   const { pickReputableMention, findAiMention, findCommentMention, isCommentDenial, isBotLikeAccount, BOT_REL_SCORE } =
     globalThis.RAB_DETECT;
-  const { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings } = globalThis.RAB_SETTINGS;
+  const { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings, subName } = globalThis.RAB_SETTINGS;
   let settings = { ...DEFAULTS };
 
   const IS_OLD = location.hostname.startsWith("old.");
@@ -123,6 +124,10 @@
       for (const id of [...commentUndos.keys()]) unhideComment(id);
       judged.clear();
       scanComments();
+    }
+    if (prev.bannedSubs.join() !== settings.bannedSubs.join()) {
+      unhideBanned();
+      hideBanned();
     }
   });
 
@@ -645,6 +650,91 @@
     return ok;
   }
 
+  // Banned subreddits. Each listing unit Reddit draws is [selector, the
+  // element to hide], so the unit goes with its divider and list item. The
+  // subreddit's own pages get the ban screen instead (gate, below).
+  const BAN_UNITS = IS_OLD
+    ? [[".thing.link[data-subreddit]", (el) => el]]
+    : [
+        ["shreddit-post", (el) => el.closest("article") || el], // feeds
+        ["community-card", (el) => el.closest("li") || el], // "Discover communities"
+        ["reddit-pdp-right-rail-post", (el) => el.closest("li") || el], // a post page's related posts
+        ["[data-testid='search-sdui-post']", (el) => el], // search results
+        ["[data-testid='search-community']", (el) => el.closest("search-telemetry-tracker") || el],
+      ];
+  let banChecked = new WeakSet(); // units whose subreddit has been read
+
+  function subOf(el) {
+    const named =
+      el.getAttribute("subreddit-name") || el.dataset.subreddit || el.getAttribute("subreddit-prefixed-name");
+    if (named) return subName(named);
+    return subName(el.getAttribute("permalink") || el.querySelector("a[href*='/r/']")?.getAttribute("href"));
+  }
+
+  async function hideBanned() {
+    await ready;
+    gate();
+    if (!settings.bannedSubs.length) return;
+    const banned = new Set(settings.bannedSubs);
+    for (const [selector, unitOf] of BAN_UNITS) {
+      for (const el of document.querySelectorAll(selector)) {
+        if (banChecked.has(el)) continue;
+        const sub = subOf(el);
+        if (!sub) continue; // its link may not have rendered yet
+        banChecked.add(el);
+        if (banned.has(sub)) unitOf(el).setAttribute("data-rab-banned", sub);
+      }
+    }
+  }
+
+  function unhideBanned() {
+    for (const el of document.querySelectorAll("[data-rab-banned]")) el.removeAttribute("data-rab-banned");
+    banChecked = new WeakSet();
+  }
+
+  // The ban screen: a copy of the modal Reddit shows on a subreddit it has
+  // banned (its <guard-community-modal>, which Reddit only loads on such
+  // pages), over the same blurred backdrop, measured on www.reddit.com on
+  // 2026-10-25. It covers every page under the subreddit until the user
+  // leaves or unbans it. Checked on every scan, since Reddit can move between
+  // subreddits without a page load.
+  const BAN_ICON =
+    '<svg viewBox="0 0 20 20" width="32" height="32" fill="currentColor" aria-hidden="true"><path d="M18.415 8.431a2.795 2.795 0 00-1.663-.821A4.854 4.854 0 0113.8 6.199a4.848 4.848 0 01-1.41-2.951 2.794 2.794 0 00-.822-1.663c-1-1.001-2.745-1.001-3.745 0L3.908 5.5a2.652 2.652 0 000 3.745 2.795 2.795 0 001.664.821c.156.017.304.057.456.087l-4.683 4.683a2.705 2.705 0 000 3.819 2.692 2.692 0 001.909.789 2.69 2.69 0 001.909-.79l4.682-4.682c.03.152.07.3.087.456a2.8 2.8 0 00.82 1.663c.5.5 1.166.776 1.874.776.708 0 1.372-.275 1.872-.776l3.915-3.915a2.65 2.65 0 000-3.745h.002Zm-14.523 8.95a.9.9 0 01-1.273-1.273l5.207-5.207c.246.17.48.359.698.575.217.217.406.452.575.698l-5.207 5.207Zm13.25-6.477-3.915 3.915a.87.87 0 01-1.2 0 .993.993 0 01-.304-.581 6.722 6.722 0 00-1.928-4.034A6.725 6.725 0 005.76 8.276a.993.993 0 01-.581-.304.85.85 0 010-1.2l3.915-3.915a.849.849 0 011.2 0 .993.993 0 01.304.581 6.72 6.72 0 001.928 4.034A6.728 6.728 0 0016.56 9.4c.2.021.406.129.58.304a.85.85 0 010 1.2Z"/></svg>';
+  const CLOSE_ICON =
+    '<svg viewBox="0 0 20 20" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="m11.273 10 5.363-5.363a.9.9 0 10-1.273-1.273L10 8.727 4.637 3.364a.9.9 0 10-1.273 1.273L8.727 10l-5.363 5.363a.9.9 0 101.274 1.273L10 11.273l5.363 5.363a.897.897 0 001.274 0 .9.9 0 000-1.273L11.275 10h-.002Z"/></svg>';
+  let gateEl = null;
+
+  function gate() {
+    const sub = subName(location.pathname);
+    const name = location.pathname.split("/")[2]; // as the URL spells it
+    const want = sub && settings.bannedSubs.includes(sub) ? sub : null;
+    if (gateEl?.dataset.sub === want) return;
+    gateEl?.remove();
+    gateEl = null;
+    document.documentElement.classList.toggle("rab-gated", !!want);
+    if (!want) return;
+    gateEl = document.createElement("div");
+    gateEl.className = "rab-gate" + (IS_OLD ? " rab-gate-old" : "");
+    gateEl.dataset.sub = want;
+    gateEl.innerHTML = `
+      <div class="rab-gate-bg"><div class="rab-gate-shade"></div></div>
+      <div class="rab-gate-modal" role="dialog" aria-modal="true" aria-labelledby="rab-gate-title">
+        <div class="rab-gate-head">${BAN_ICON}<h2 id="rab-gate-title"></h2>
+          <a class="rab-gate-close" href="/r/popular" aria-label="Close">${CLOSE_ICON}</a></div>
+        <p>This subreddit was banned by you, with Quorum.</p>
+        <div class="rab-gate-actions">
+          <button type="button" class="rab-gate-unban">Unban</button>
+          <a class="rab-gate-primary" href="/r/popular">Browse Other Communities</a>
+        </div>
+      </div>`;
+    gateEl.querySelector("h2").textContent = `r/${name} is banned`;
+    // The tabs hear the change and lift the screen (and the hidden listings).
+    gateEl.querySelector(".rab-gate-unban").addEventListener("click", () =>
+      chrome.storage.sync.set({ settings: { ...settings, bannedSubs: settings.bannedSubs.filter((s) => s !== want) } })
+    );
+    document.body.append(gateEl);
+  }
+
   // Two observers. Near the viewport, a cached verdict is applied at once so a
   // known post is blurred before it scrolls into view. Fetching waits until a
   // post has stayed in the middle half of the screen for the dwell setting
@@ -694,8 +784,9 @@
   // the DOM per mutation.
   let scanTimer = 0;
   new MutationObserver(() => {
-    if (!scanTimer) scanTimer = setTimeout(() => ((scanTimer = 0), scan(), scanComments()), 250);
+    if (!scanTimer) scanTimer = setTimeout(() => ((scanTimer = 0), hideBanned(), scan(), scanComments()), 250);
   }).observe(document.documentElement, { childList: true, subtree: true });
+  hideBanned();
   scan();
   scanComments();
 })();

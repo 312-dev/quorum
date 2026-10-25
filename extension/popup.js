@@ -1,7 +1,7 @@
 // The toolbar popup: reads and writes the settings in chrome.storage.sync
 // (every open Reddit tab applies a change at once), tallies the cached post
 // verdicts, and clears them.
-const { STRICTNESS, RULE_KEYS, loadSettings } = globalThis.RAB_SETTINGS;
+const { STRICTNESS, RULE_KEYS, loadSettings, subName } = globalThis.RAB_SETTINGS;
 let settings;
 
 // Reddit-weight arrows for the vote switch: a wide head on a short stem.
@@ -28,6 +28,24 @@ function show() {
   document.getElementById("strictness-hint").innerHTML =
     `Needs <b>+${min}</b> and ${Math.round(rel * 100)}% of the top comment`;
   document.querySelector("[data-group='commentStyle']").classList.toggle("off", !settings.comments);
+  showBans();
+}
+
+function showBans() {
+  const list = document.getElementById("bans");
+  list.replaceChildren(
+    ...settings.bannedSubs.map((sub) => {
+      const li = document.createElement("li");
+      li.textContent = `r/${sub}`;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", `Unban r/${sub}`);
+      remove.addEventListener("click", () => save("bannedSubs", settings.bannedSubs.filter((s) => s !== sub)));
+      li.append(remove);
+      return li;
+    })
+  );
 }
 
 function showDwell(value) {
@@ -73,6 +91,21 @@ document.body.addEventListener("change", (e) => {
   save(input.name, input.type === "range" ? +input.value : input.value);
 });
 
+// Takes one or more names, links or "r/" forms, split by spaces or commas.
+// Anything that is not a subreddit stays in the field with an error.
+document.getElementById("ban-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = document.getElementById("ban-input");
+  const parts = input.value.split(/[\s,]+/).filter(Boolean);
+  const names = parts.map(subName);
+  const bad = parts.filter((_, i) => !names[i]);
+  input.value = bad.join(" ");
+  document.getElementById("ban-error").textContent = bad.length ? `Not a subreddit name: ${bad[0]}` : "";
+  const next = [...new Set([...settings.bannedSubs, ...names.filter(Boolean)])].sort();
+  if (next.length !== settings.bannedSubs.length) save("bannedSubs", next);
+  input.focus();
+});
+
 // The slider's readout and run follow the thumb; the setting is saved on release.
 document.querySelector("input[name='dwell']").addEventListener("input", (e) => showDwell(e.target.value));
 
@@ -81,6 +114,14 @@ document.getElementById("clear").addEventListener("click", async (e) => {
   showStats();
   e.target.textContent = "Cache cleared";
   setTimeout(() => (e.target.textContent = "Clear cache"), 1500);
+});
+
+// A change made elsewhere (a ban screen's Unban, another window's panel) is
+// shown, and is the base for this panel's next save.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "sync" || !changes.settings || !settings) return;
+  settings = { ...settings, ...changes.settings.newValue };
+  show();
 });
 
 loadSettings().then((s) => {

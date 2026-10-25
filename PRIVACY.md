@@ -1,6 +1,6 @@
 # Quorum for Reddit: Privacy Policy
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 Quorum is a browser extension that hides Reddit posts and comments that other commenters call out
 as AI-generated or as bots. It does its work entirely in your browser. It has no server, no
@@ -24,7 +24,7 @@ Everything below stays on your device in Chrome's extension storage:
 |---|---|---|
 | Post IDs with the verdict, the deciding comment's score and a short quote of it | so a post is not checked again on every visit | 7 days for flagged posts, 1 hour for clean ones |
 | Author account age and karma | so an author's profile card is not fetched repeatedly | 7 days |
-| Your options (on/off switches, strictness, wait time) | to remember your choices | until you change them |
+| Your options (on/off switches, strictness, wait time, banned subreddits) | to remember your choices | until you change them |
 
 Your options are saved with `chrome.storage.sync`, so if you use Chrome Sync, Google syncs them
 between your own browsers like any other extension setting. Nothing else is synced.

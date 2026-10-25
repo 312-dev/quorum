@@ -9,6 +9,7 @@
     bots: true, // count bot and karma-farming callouts, not just AI ones
     strictness: "normal", // key of STRICTNESS
     dwell: 2, // seconds a post rests mid-screen before its comments are fetched
+    bannedSubs: [], // lowercase subreddit names, without "r/", kept out of feeds
   };
 
   // How well-voted a callout must be: at least `min` points and `rel` of the
@@ -28,5 +29,13 @@
     return { ...DEFAULTS, ...settings };
   }
 
-  root.RAB_SETTINGS = { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings };
+  // The lowercase subreddit name in "r/Pics", "pics", "/r/pics/" or a
+  // reddit.com link to anything under it; null if there is none.
+  function subName(text) {
+    const s = String(text || "").trim();
+    const m = s.match(/(?:^|\/)r\/([a-z0-9_]{2,21})(?:[/?#]|$)/i) || s.match(/^([a-z0-9_]{2,21})$/i);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  root.RAB_SETTINGS = { DEFAULTS, STRICTNESS, RULE_KEYS, loadSettings, subName };
 })(globalThis);

@@ -70,6 +70,22 @@
     </label>
   </section>
 
+  <section aria-labelledby="ban-h">
+    <h2 id="ban-h">Ban</h2>
+    <form class="row stack" id="ban-form" novalidate>
+      <span class="text">
+        <span class="name">Subreddits</span>
+        <span class="hint">Kept out of feeds, search and suggestions, and shown as banned if you visit</span>
+      </span>
+      <span class="add">
+        <label class="field"><span aria-hidden="true">r/</span><input id="ban-input" type="text" placeholder="subreddit" aria-label="Subreddit to ban" autocomplete="off" spellcheck="false"></label>
+        <button type="submit" class="btn">Ban</button>
+      </span>
+      <span class="note" id="ban-error" role="status"></span>
+      <ul class="chips" id="bans" aria-label="Banned subreddits"></ul>
+    </form>
+  </section>
+
   <footer>
     <span class="hint">Flagged posts are kept 7 days</span>
     <button type="button" id="clear">Clear cache</button>

@@ -42,6 +42,8 @@ Everything the developer dashboard asks for, ready to paste. Build the upload wi
     • Spoiler or collapse for hidden comments
     • Lenient, normal or strict vote thresholds
     • How long a post must stay on screen before it's checked, so fast scrolling costs nothing
+    • Ban subreddits: their posts and suggestions vanish from feeds, search and the sidebar, and
+      visiting one shows a ban screen
 
     PRIVATE BY DESIGN
     Everything runs in your browser. No account, no server, no analytics. Quorum reads Reddit's

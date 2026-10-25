@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Quorum for Reddit: Community-Verified AI & Bot Filter",
   "short_name": "Quorum",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Hides Reddit posts and comments that well-upvoted comments call out as AI or bots, behind Reddit's own blur and spoiler.",
   "icons": {
     "16": "icons/icon-16.png",

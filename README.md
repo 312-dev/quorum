@@ -3,8 +3,9 @@
 Community-verified AI and bot filter. A Chrome extension (MV3) that blurs Reddit posts whose comments call them out as AI or as bot /
 karma-farming posts, using Reddit's own NSFW blur with the button relabelled `Potential AI`. Click it to reveal the post. Works in feeds
 and on a post's own page. On a comments page it also hides comments that replies call out as
-AI-written, behind Reddit's spoiler bar with a `Potential AI` badge beside the author. r/isthisAI is
-a good place to try it.
+AI-written, behind Reddit's spoiler bar with a `Potential AI` badge beside the author. Subreddits
+you ban drop out of every listing, and their own pages show Reddit's banned-community screen.
+r/isthisAI is a good place to try it.
 
 ## Install
 
@@ -28,9 +29,21 @@ profile (`chrome.storage.sync`, defaults in `extension/settings.js`):
 | Bot callouts | on | Count bot and karma-farming callouts and the account check, not just AI ones |
 | Strictness | Normal | Lenient: 3 points and 10% of the top comment; Normal: 5 and 20%; Strict: 10 and 35% |
 | Wait before checking a post | 2 s | The dwell below; 0 to 5 s |
+| Ban subreddits | none | Type names, `r/` names or links, separated by spaces or commas; remove with a chip's × |
 
 Changing Bot callouts or Strictness clears the cached verdicts so posts are judged again. The panel
 also shows how many cached posts are flagged and clears the cache (verdicts and accounts).
+
+## Banned subreddits
+
+A banned subreddit's posts and suggestions are removed (`display: none`, never blurred) wherever
+New Reddit lists them: feeds (`shreddit-post`, with the divider after it), the "Discover
+communities" cards, a post page's related posts, and search results; on old Reddit, any
+`.thing.link` of it. Removed posts are never fetched. Any page under `/r/<name>/` gets a copy of
+the modal Reddit shows on a subreddit it has banned (`<guard-community-modal>`, which Reddit only
+loads on such pages), with its blurred backdrop and light and dark colours, saying the ban is
+yours, and an Unban button beside Browse Other Communities. `BAN_UNITS` in `content.js` lists
+the units; the modal's measurements are in `content.css`.
 
 ## How it decides
 
@@ -136,7 +149,7 @@ fetching and fast scrolling; Reddit's blur component (against a stand-in in
 `tests/fixtures/mock-blurred-container.js`) on media and text posts, in the feed and on a post's
 own page; the fallback overlay; click to reveal; caching across reloads, tabs and pages; old
 Reddit; comment callouts (unit), and comment spoilers (against `tests/fixtures/mock-spoiler.js`
-and the fallback), badges, collapse and old Reddit comments; the popup's options applying live; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
+and the fallback), badges, collapse and old Reddit comments; the popup's options applying live; banned subreddits across every listing unit and the ban screen; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
 end to end, including the cache being cleared (about 30 s, since it waits on the worker's
 reconnect alarm). Setting `RAB_EXT=<dir>` runs the tests against another copy of the extension; `RAB_EXT=$PWD/dist/build npx playwright test --grep-invert "hot reload"` checks the store build.
 
