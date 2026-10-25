@@ -1,10 +1,12 @@
 {
-  "name": "reddit-ai-blur",
+  "name": "quorum",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node dev/hot-reload-server.mjs",
-    "test": "playwright test"
+    "test": "playwright test",
+    "package": "node dev/package.mjs",
+    "icons": "node dev/export-icons.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

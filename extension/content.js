@@ -330,7 +330,7 @@
 
   function flag(id, el, snippet) {
     if (undos.has(id)) return;
-    const title = snippet ? `Upvoted comment ${snippet}` : "";
+    const title = snippet ? `Quorum reached: upvoted comment ${snippet}` : "";
     const undo = (!IS_OLD && blurWithReddit(id, el, title)) || blurWithOverlay(id, el, title);
     undos.set(id, undo);
   }
@@ -519,7 +519,7 @@
       judged.set(id, kids.length);
       const hit = pickReputableMention(kids.map(commentData), rules);
       el.setAttribute("data-rab-comment", hit ? "ai" : "clean");
-      if (hit) hideComment(id, el, `Reply (+${hit.score}) "${hit.snippet}"`);
+      if (hit) hideComment(id, el, `Quorum reached: reply (+${hit.score}) "${hit.snippet}"`);
     }
   }
 

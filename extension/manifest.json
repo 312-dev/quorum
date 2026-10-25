@@ -1,8 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Reddit AI Blur",
-  "version": "0.2.0",
-  "description": "Blurs Reddit posts, and hides comments, that other comments call out as AI or bots, behind Reddit's own click-to-reveal blur and spoiler.",
+  "name": "Quorum for Reddit: Community-Verified AI & Bot Filter",
+  "short_name": "Quorum",
+  "version": "0.3.0",
+  "description": "Hides Reddit posts and comments that well-upvoted comments call out as AI or bots, behind Reddit's own blur and spoiler.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": [
     "storage",
     "alarms"
@@ -32,17 +39,11 @@
     }
   ],
   "action": {
-    "default_title": "Reddit AI Blur",
+    "default_title": "Quorum",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"
     }
-  },
-  "icons": {
-    "16": "icons/icon-16.png",
-    "32": "icons/icon-32.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
   }
 }

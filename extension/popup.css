@@ -1,27 +1,54 @@
-/* Reddit's own type stack and neutrals, so the panel reads as part of the
-   site; the header pill is the label the extension puts on posts. */
+/* Split Vote, the panel's design language, taken from the icon:
+   - two vote colours with fixed meanings: upvote orange is "on" and the
+     crowd's call, downvote periwinkle is "off" and the AI mark
+   - one 2.5px stroke weight; separation comes from surface steps
+   - "the cut": a shape sitting on another is ringed by a 3px gap in the
+     surface colour, as the icon's tail cuts its hook
+   - numbers (scores, thresholds, timings) in mono
+   Text on either vote colour is always Ink, never white. */
+
+@font-face {
+  font-family: "Unbounded";
+  src: url("fonts/unbounded.woff2") format("woff2");
+  font-weight: 700 800;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("fonts/instrument-sans.woff2") format("woff2");
+  font-weight: 400 700;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 500 700;
+}
+
 :root {
+  --up: #ff4500;
+  --down: #7193ff;
+  --ink: #16181a;
   --bg: #ffffff;
-  --surface: #f6f7f8;
-  --text: #0f1a1c;
-  --weak: #576f76;
-  --line: rgba(0, 0, 0, 0.1);
-  --accent: #115bca;
-  --knob: #ffffff;
-  --track: #c4ccce;
+  --raised: #f4f5f7;
+  --track: #dfe3e8;
+  --text: #16181a;
+  --muted: #5c656d;
+  --stroke: 2.5px;
+  --cut: 3px;
+  --display: "Unbounded", system-ui, sans-serif;
+  --body: "Instrument Sans", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e1113;
-    --surface: #1a1d1f;
-    --text: #f2f4f5;
-    --weak: #8ba2ad;
-    --line: rgba(255, 255, 255, 0.12);
-    --accent: #648efc;
-    --knob: #ffffff;
-    --track: #3e4a4f;
+    --bg: #16181a;
+    --raised: #202327;
+    --track: #2c3035;
+    --text: #edeff2;
+    --muted: #9aa3ab;
     color-scheme: dark;
   }
 }
@@ -31,11 +58,11 @@
 }
 
 body {
-  width: 320px;
+  width: 336px;
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/20px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font: 14px/1.4 var(--body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -43,39 +70,76 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px 10px;
+  padding: 16px 16px 0;
 }
 
 h1 {
   margin: 0;
-  font-size: 15px;
+  font: 800 17px/1 var(--display);
+  letter-spacing: -0.01em;
+}
+
+h1 span {
+  color: var(--muted);
   font-weight: 700;
 }
 
-/* Reddit's NSFW "media" pill, as measured for content.css. */
-.pill {
-  height: 26px;
-  padding: 0 9px;
-  border: 1px solid rgba(255, 255, 255, 0.098);
-  border-radius: 999px;
-  background: #1a1a1b;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 24px;
-  white-space: nowrap;
+/* The tally rule: flagged share in orange, the rest in periwinkle, split by
+   the cut. Grey on both sides until anything has been checked. */
+.split {
+  display: flex;
+  gap: var(--cut);
+  height: var(--stroke);
+  margin: 14px 16px 6px;
+}
+
+.split::before,
+.split::after {
+  content: "";
+  border-radius: 2px;
+  background: var(--track);
+  transition: flex-grow 300ms ease;
+}
+
+.split::before {
+  flex: var(--flagged, 1) 1 0;
+}
+
+.split::after {
+  flex: var(--clean, 1) 1 0;
+}
+
+.split.live::before {
+  background: var(--up);
+}
+
+.split.live::after {
+  background: var(--down);
+}
+
+.tally {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 16px 4px;
+  color: var(--muted);
+  font: 500 12px var(--mono);
+}
+
+.tally b {
+  color: var(--text);
+  font-weight: 700;
 }
 
 section {
-  padding: 4px 0 6px;
-  border-top: 1px solid var(--line);
+  padding: 8px 16px 4px;
 }
 
 h2 {
-  margin: 8px 16px 2px;
-  color: var(--weak);
-  font-size: 12px;
-  font-weight: 600;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font: 700 11px/1 var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .row {
@@ -83,25 +147,18 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 16px;
-}
-
-label.row {
-  cursor: pointer;
-}
-
-label.row:hover {
-  background: var(--surface);
+  padding: 10px 0;
 }
 
 .row.stack {
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 8px;
 }
 
-.row.sub {
-  padding-top: 2px;
+.row.off {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .text,
@@ -119,69 +176,97 @@ label.row:hover {
 }
 
 .name {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .hint {
-  color: var(--weak);
-  font-size: 12px;
-  line-height: 16px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
 }
 
-.num {
-  font-variant-numeric: tabular-nums;
-}
-
+.num,
 output {
-  color: var(--weak);
+  font: 700 12px var(--mono);
 }
 
-/* Switch */
-input[role="switch"] {
-  appearance: none;
+/* The vote switch: Reddit's vote pill as an on/off control. Upvote fills
+   orange for on, downvote fills periwinkle for off; the state word sits
+   between the arrows like a score. */
+.vote {
   flex: none;
-  position: relative;
-  width: 36px;
-  height: 20px;
-  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 0 3px;
+  border: 0;
   border-radius: 999px;
-  background: var(--track);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 var(--stroke) var(--track);
+  color: var(--muted);
+  font: 700 11px var(--mono);
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: background-color 150ms ease;
 }
 
-input[role="switch"]::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--knob);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+.vote svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.vote path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+
+.vote .state {
+  min-width: 26px;
+  text-align: center;
+}
+
+.vote[aria-checked="true"] {
+  background: var(--up);
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.vote[aria-checked="true"] .up path {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+
+.vote[aria-checked="false"] .down {
+  color: var(--down);
+}
+
+.vote[aria-checked="false"] .down path {
+  fill: var(--down);
+  stroke: var(--down);
+}
+
+.vote .up,
+.vote .down {
   transition: transform 150ms ease;
 }
 
-input[role="switch"]:checked {
-  background: var(--accent);
+.vote[aria-checked="true"] .up {
+  transform: translateY(-1px);
 }
 
-input[role="switch"]:checked::after {
-  transform: translateX(16px);
+.vote[aria-checked="false"] .down {
+  transform: translateY(1px);
 }
 
-/* Segmented control */
+/* Segmented control: the chosen option is filled in the text colour. */
 .seg {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.seg.wide {
   display: flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--track);
 }
 
 .seg label {
@@ -197,37 +282,55 @@ input[role="switch"]:checked::after {
 
 .seg span {
   display: block;
-  padding: 3px 12px;
+  padding: 5px 10px;
   border-radius: 999px;
-  color: var(--weak);
-  font-size: 12px;
+  color: var(--muted);
+  font-size: 12.5px;
   font-weight: 600;
   text-align: center;
   transition: background-color 150ms ease, color 150ms ease;
 }
 
 .seg input:checked + span {
-  background: var(--bg);
-  color: var(--text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  background: var(--text);
+  color: var(--bg);
 }
 
-.seg input:focus-visible + span,
-input:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.note {
+  color: var(--muted);
+  font: 500 11.5px var(--mono);
 }
 
-.row.off {
-  opacity: 0.45;
-  pointer-events: none;
+.note b {
+  color: var(--up);
+  font-weight: 700;
 }
 
+/* Slider: a thick rail, the run so far in orange (--pct, set by popup.js),
+   and a thumb ringed by the cut. */
 input[type="range"] {
+  appearance: none;
   width: 100%;
+  height: 22px;
   margin: 0;
-  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--up) var(--pct, 40%), var(--track) var(--pct, 40%));
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--up);
+  box-shadow: 0 0 0 var(--cut) var(--bg);
 }
 
 footer {
@@ -235,28 +338,34 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 16px 14px;
-  border-top: 1px solid var(--line);
-  color: var(--weak);
-  font-size: 12px;
+  padding: 10px 16px 16px;
 }
 
-button {
+#clear {
   flex: none;
-  height: 28px;
-  padding: 0 12px;
+  height: 32px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 var(--stroke) var(--track);
   color: var(--text);
-  font: inherit;
-  font-weight: 600;
+  font: 600 13px var(--body);
   cursor: pointer;
 }
 
-button:hover {
-  background: var(--line);
+#clear:hover,
+.vote:hover {
+  filter: brightness(0.97);
+}
+
+/* Focus uses the AI-neutral periwinkle ring for every control. */
+.vote:focus-visible,
+#clear:focus-visible,
+.seg input:focus-visible + span,
+input[type="range"]:focus-visible {
+  outline: var(--stroke) solid var(--down);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

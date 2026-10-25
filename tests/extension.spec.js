@@ -516,11 +516,11 @@ test("popup: collapse style, bot callouts off, comments off; each applies live",
   await expect(comment(page, "c1").locator(".rab-spoiler")).toHaveCount(0);
   await expect(comment(page, "c1").locator(".rab-badge")).toHaveText("Potential AI");
 
-  await popup.locator("input[name=bots]").click();
+  await popup.locator("[data-setting=bots]").click();
   await expect.poll(() => commentState(page, "c5")).toBe("clean");
   expect(await commentState(page, "c1")).toBe("ai"); // the AI callout still counts
 
-  await popup.locator("input[name=comments]").click();
+  await popup.locator("[data-setting=comments]").click();
   await expect(page.locator(".rab-badge")).toHaveCount(0);
   await expect.poll(() => details.evaluate((d) => d.open)).toBe(true);
   await expect(popup.locator("[data-group=commentStyle]")).toHaveClass(/off/);
@@ -530,7 +530,7 @@ test("popup: collapse style, bot callouts off, comments off; each applies live",
   // queued, so that scan cannot be what re-judges them.
   await page.waitForTimeout(600);
   expect(await commentState(page, "c1")).toBeNull();
-  await popup.locator("input[name=comments]").click();
+  await popup.locator("[data-setting=comments]").click();
   await expect.poll(() => commentState(page, "c1")).toBe("ai");
   await expect(comment(page, "c1").locator(".rab-badge")).toHaveCount(1);
 });
@@ -551,9 +551,11 @@ test("popup: posts off lifts the blur, on restores it from cache; strictness re-
   await scrollTo(page, "lowvote");
   await expect.poll(() => state(page, "lowvote")).toBe("ai");
   const popup = await openPopup(ext);
-  await expect(popup.locator("#stats")).toHaveText("2 flagged of 2 checked posts");
+  await expect(popup.locator("#flagged")).toHaveText("2");
+  await expect(popup.locator("#checked")).toHaveText("2");
 
-  await popup.locator("input[name=posts]").click();
+  await popup.locator("[data-setting=posts]").click();
+  await expect(popup.locator("[data-setting=posts]")).toHaveAttribute("aria-checked", "false");
   await expect(page.locator(".rab-overlay")).toHaveCount(0);
   await expect.poll(() => state(page, "lowvote")).toBe("off");
   expect(await page.locator("#t3_ai1").evaluate((e) => getComputedStyle(e).filter)).toBe("none");
@@ -565,16 +567,18 @@ test("popup: posts off lifts the blur, on restores it from cache; strictness re-
   await expect(page.locator(".rab-overlay")).toHaveCount(0);
 
   const before = ext.fetched.length;
-  await popup.locator("input[name=posts]").click();
+  await popup.locator("[data-setting=posts]").click();
   await expect.poll(() => state(page, "ai1")).toBe("ai");
   expect(ext.fetched.length).toBe(before);
 
   // Strict needs 35% of the top comment: lowvote's +120 against +500 fails.
   await popup.getByText("Strict", { exact: true }).click();
-  await expect(popup.locator("#strictness-hint")).toHaveText("A callout needs 10+ points and 35% of the top comment's score");
+  await expect(popup.locator("#strictness-hint")).toHaveText("Needs +10 and 35% of the top comment");
   await expect.poll(() => state(page, "lowvote")).toBe("clean");
   expect(ext.fetched.length).toBeGreaterThan(before);
 
   await popup.locator("#clear").click();
-  await expect(popup.locator("#stats")).toHaveText("0 flagged of 0 checked posts");
+  await expect(popup.locator("#flagged")).toHaveText("0");
+  await expect(popup.locator("#checked")).toHaveText("0");
+  await expect(popup.locator("#clear")).toHaveText("Cache cleared");
 });
