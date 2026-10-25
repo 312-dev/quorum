@@ -50,7 +50,7 @@
 
   function postInfo(el) {
     if (IS_OLD) {
-      return { id: el.dataset.fullname.slice(3), comments: +el.dataset.numComments || 0 };
+      return { id: el.dataset.fullname.slice(3), comments: +el.dataset.commentsCount || 0 };
     }
     return {
       id: el.id.slice(3),
