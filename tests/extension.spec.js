@@ -307,8 +307,31 @@ test("works on old reddit", async ({ ext }) => {
   await page.goto("https://old.reddit.com/r/test/");
   await expect.poll(() => state(page, "oldai")).toBe("ai");
   await expect.poll(() => state(page, "oldclean")).toBe("clean");
-  await expect(page.locator('[data-fullname="t3_oldai"] > .rab-overlay')).toContainText("Potential AI");
-  await expect(page.locator('[data-fullname="t3_oldclean"] > .rab-overlay')).toHaveCount(0);
+  const ai = post(page, "oldai");
+  const filter = (loc) => loc.evaluate((e) => getComputedStyle(e).filter);
+  // Old Reddit's parts: a stamp in the button row, the thumbnail blurred.
+  const stamp = ai.locator(".entry ul.flat-list.buttons > li:first-child > .stamp.rab-stamp");
+  await expect(stamp).toHaveText("POTENTIAL AI");
+  await expect(stamp).toHaveAttribute("title", /\+77/);
+  expect(await filter(ai.locator("a.thumbnail > img"))).toContain("blur");
+  await expect(page.locator(".rab-overlay")).toHaveCount(0);
+  await expect(post(page, "oldclean").locator(".rab-stamp")).toHaveCount(0);
+  expect(await filter(post(page, "oldclean").locator("a.thumbnail"))).toBe("none");
+
+  // The thumbnail opens the media, blurred, instead of following its link.
+  await ai.locator("a.thumbnail").click();
+  await expect(page).toHaveURL("https://old.reddit.com/r/test/");
+  const media = ai.locator(".expando > .media-preview");
+  await expect(media).toBeVisible();
+  expect(await filter(media)).toContain("blur");
+  expect(await state(page, "oldai")).toBe("ai");
+
+  // A click on the media lifts the blur from it and the thumbnail.
+  await ai.locator(".expando").click();
+  await expect.poll(() => state(page, "oldai")).toBe("revealed");
+  expect(await filter(media)).toBe("none");
+  expect(await filter(ai.locator("a.thumbnail > img"))).toBe("none");
+  await expect(stamp).toHaveText("POTENTIAL AI");
 });
 
 test("uses Reddit's own blur component when the page defines it", async ({ ext }) => {
@@ -541,13 +564,19 @@ test("popup: collapse style, bot callouts off, comments off; each applies live",
   await expect(comment(page, "c1").locator(".rab-badge")).toHaveCount(1);
 });
 
-test("old reddit comments get the flair badge and the fallback spoiler", async ({ ext }) => {
+test("old reddit comments get the flair badge and old reddit's own spoiler", async ({ ext }) => {
   const page = await ext.context.newPage();
   await page.goto("https://old.reddit.com/r/test/comments/thread1/x/");
   await expect.poll(() => commentState(page, "c1")).toBe("ai");
   for (const id of ["c2", "c3", "c4"]) expect(await commentState(page, id)).toBe("clean");
   await expect(comment(page, "c1").locator(":scope > .entry .tagline .author + .flair.rab-badge")).toHaveText("Potential AI");
-  await expect(comment(page, "c1").locator(":scope > .entry .md span.rab-spoiler")).toHaveCount(2);
+  const spoilers = comment(page, "c1").locator(":scope > .entry .md span.md-spoiler-text");
+  await expect(spoilers).toHaveCount(2);
+  await expect(comment(page, "c1").locator(".rab-spoiler")).toHaveCount(0); // not New Reddit's bar
+  // Revealing one reveals both, with old Reddit's class for its stylesheet.
+  await spoilers.first().click();
+  await expect.poll(() => spoilers.evaluateAll((s) => s.map((e) => e.classList.contains("revealed")))).toEqual([true, true]);
+  expect(await commentState(page, "c1")).toBe("revealed");
 });
 
 test("popup: posts off lifts the blur, on restores it from cache; strictness re-judges", async ({ ext }) => {

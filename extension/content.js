@@ -336,7 +336,7 @@
   function flag(id, el, snippet) {
     if (undos.has(id)) return;
     const title = snippet ? `Quorum reached: upvoted comment ${snippet}` : "";
-    const undo = (!IS_OLD && blurWithReddit(id, el, title)) || blurWithOverlay(id, el, title);
+    const undo = IS_OLD ? blurOld(id, el, title) : blurWithReddit(id, el, title) || blurWithOverlay(id, el, title);
     undos.set(id, undo);
   }
 
@@ -423,12 +423,11 @@
     if (button.getAttribute("aria-label") !== ARIA_LABEL) button.setAttribute("aria-label", ARIA_LABEL);
   }
 
-  // Fallback for old Reddit, which has no blur component: content.css copies
-  // the component's measured styles onto a plain overlay. New Reddit renders
-  // shreddit-post through a shadow root, so the overlay goes on its <article>
-  // wrapper (or one we add); old Reddit's .thing is plain DOM.
+  // Fallback for a page where Reddit's blur component is missing: content.css
+  // copies the component's measured styles onto a plain overlay. shreddit-post
+  // renders through a shadow root, so the overlay goes on its <article>
+  // wrapper (or one we add).
   function wrapperFor(el) {
-    if (IS_OLD) return el;
     const article = el.closest("article");
     if (article) return article;
     if (el.parentElement?.classList.contains("rab-wrap")) return el.parentElement;
@@ -464,6 +463,51 @@
     return () => {
       overlay.remove();
       wrap.classList.remove("rab-flagged");
+    };
+  }
+
+  // Old Reddit blurs nothing itself: an NSFW post there gets a stock
+  // thumbnail and a red NSFW stamp, and its media stays shut on its own page.
+  // This blur is built from those parts: a stamp in the post's button row, the
+  // thumbnail blurred, and the opened media or text blurred under a
+  // stamp-styled label until clicked. Reddit rebuilds the expando each time it
+  // opens, so the blur hangs off a class on the post (content.css), never off
+  // nodes inside the expando.
+  function blurOld(id, el, title) {
+    el.classList.add("rab-old-flagged");
+    const li = document.createElement("li");
+    const stamp = document.createElement("span");
+    stamp.className = "stamp rab-stamp";
+    stamp.textContent = LABEL.toUpperCase();
+    stamp.title = title;
+    li.append(stamp);
+    el.querySelector(":scope > .entry ul.flat-list.buttons")?.prepend(li);
+    const lift = () => {
+      el.classList.remove("rab-old-flagged");
+      el.removeEventListener("click", onClick, true);
+    };
+    const onClick = (e) => {
+      const expando = e.target.closest(".expando");
+      if (expando && el.contains(expando)) {
+        e.preventDefault();
+        e.stopPropagation();
+        lift();
+        revealed.add(id);
+        setState(id, "revealed");
+        return;
+      }
+      // The thumbnail opens the blurred media rather than the original. A link
+      // post with nothing to expand still goes where it points.
+      const button = el.querySelector(":scope > .entry .expando-button");
+      if (e.target.closest("a.thumbnail")?.parentElement !== el || !button) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (button.classList.contains("collapsed")) button.click();
+    };
+    el.addEventListener("click", onClick, true);
+    return () => {
+      lift();
+      li.remove();
     };
   }
 
@@ -579,8 +623,10 @@
 
   // Reddit's spoiler: its <shreddit-spoiler> is inline, so each paragraph (or
   // list item, heading, cell) gets its own, and revealing one reveals the
-  // rest. Where the component is missing (old Reddit), content.css draws the
-  // same bar with its measured values.
+  // rest. Old Reddit gets its own spoiler markup, span.md-spoiler-text, which
+  // its stylesheet draws and its script reveals (a delegated handler, so it
+  // takes spans added later); this reveals the siblings. Where the component
+  // is missing on New Reddit, content.css draws its bar with measured values.
   function spoil(el) {
     const body = ownBody(el);
     if (!body) return () => {};
@@ -589,6 +635,12 @@
     const native = !IS_OLD && isDefined("shreddit-spoiler");
     const spoilers = blocks.map((block) => {
       const sp = document.createElement(native ? "shreddit-spoiler" : "span");
+      if (IS_OLD) {
+        sp.className = "md-spoiler-text rab-old-spoiler";
+        sp.append(...block.childNodes);
+        block.append(sp);
+        return sp;
+      }
       sp.classList.add("rab-spoiler");
       if (native) sp.append(...block.childNodes);
       else {
@@ -603,12 +655,13 @@
       block.append(sp);
       return sp;
     });
-    const isHidden = (sp) => (native ? sp.hasAttribute("embed-obscured") : !sp.classList.contains("rab-revealed"));
+    const shownClass = IS_OLD ? "revealed" : "rab-revealed";
+    const isHidden = (sp) => (native ? sp.hasAttribute("embed-obscured") : !sp.classList.contains(shownClass));
     const revealAll = () => {
       for (const sp of spoilers) {
         if (!isHidden(sp)) continue;
         if (native) sp.shadowRoot?.querySelector(".outer")?.click();
-        else sp.classList.add("rab-revealed");
+        else sp.classList.add(shownClass);
       }
       el.setAttribute("data-rab-comment", "revealed");
     };
@@ -620,9 +673,10 @@
       for (const sp of spoilers) watcher.observe(sp, { attributes: true, attributeFilter: ["embed-obscured"] });
     } else {
       onClick = (e) => {
-        if (!e.target.closest?.(".rab-spoiler") || !spoilers.some(isHidden)) return;
+        if (!e.target.closest?.(".rab-spoiler, .rab-old-spoiler") || !spoilers.some(isHidden)) return;
         e.preventDefault(); // a link under the bar is not followed until revealed
-        e.stopPropagation();
+        // Old Reddit's own handler on the span still runs, to drop its tooltip.
+        if (!IS_OLD) e.stopPropagation();
         revealAll();
       };
       body.addEventListener("click", onClick, true);
@@ -631,7 +685,7 @@
       watcher?.disconnect();
       if (onClick) body.removeEventListener("click", onClick, true);
       for (const sp of spoilers) {
-        const content = native ? sp : sp.firstChild;
+        const content = native || IS_OLD ? sp : sp.firstChild;
         sp.replaceWith(...content.childNodes);
       }
     };

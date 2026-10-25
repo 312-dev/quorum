@@ -100,16 +100,26 @@ own border) or text body go into the `revealed` slot of Reddit's own
 `<shreddit-blurred-container reason="nsfw">`, so the blur, scrim, pill and click to reveal are
 Reddit's; text posts get Reddit's 88px blurred strip (`is-richtext-content`). A post with neither is
 wrapped whole. The extension only swaps the pill's text, from a `MutationObserver` on the
-component's shadow root so Reddit's "View NSFW content" never paints. Old Reddit has no such
-component, so `content.css` draws a plain overlay over the whole row using the component's
-measured values (40px blur, `rgba(0,0,0,.8)` fill, `.6` scrim, 32px media pill).
+component's shadow root so Reddit's "View NSFW content" never paints. Should the component be
+missing, `content.css` draws a plain overlay using its measured values (40px blur,
+`rgba(0,0,0,.8)` fill, `.6` scrim, 32px media pill).
+
+Old Reddit never blurred anything: an NSFW post there gets a stock thumbnail, a red `NSFW` stamp,
+and media that stays shut on its own page. So its blur is made of those parts. A periwinkle
+`POTENTIAL AI` `.stamp` leads the button row, the thumbnail is blurred (Reddit's stock icons too, so
+a blurred thumbnail always means flagged), and a click on it opens the media instead of following
+the link. Opened media or text is blurred under a stamp-styled "click to show" label, and one click
+lifts the blur from it and the thumbnail. Reddit rebuilds the expando whenever it opens, so the blur
+hangs off a class on the post rather than off nodes inside it.
 
 A comment is hidden with Reddit's `<shreddit-spoiler>`, one per paragraph (the component is inline,
 so it cannot wrap block paragraphs), and revealing any of them reveals the rest. The badge uses the
 classes Reddit gives user flair in the same row. With "Collapsed", the comment's `<details>` is
 closed, the toggle Reddit's own collapse button flips, so the badge stays visible on the one-line
-row. Old Reddit gets its native `.flair` for the badge and a spoiler bar drawn by `content.css` with
-the component's measured values (`#131313`, 2px corners).
+row. Old Reddit gets its native `.flair` for the badge and its own spoiler markup,
+`span.md-spoiler-text`, which its stylesheet draws (`#4f4f4f`) and its script reveals with a "Reveal
+spoiler" tooltip; revealing one reveals the rest. Where `<shreddit-spoiler>` is missing on New
+Reddit, `content.css` draws its bar with measured values (`#131313`, 2px corners).
 
 ## Design
 
@@ -148,8 +158,9 @@ threads and hover-card numbers (unit); the account lookup and when it is skipped
 fetching and fast scrolling; Reddit's blur component (against a stand-in in
 `tests/fixtures/mock-blurred-container.js`) on media and text posts, in the feed and on a post's
 own page; the fallback overlay; click to reveal; caching across reloads, tabs and pages; old
-Reddit; comment callouts (unit), and comment spoilers (against `tests/fixtures/mock-spoiler.js`
-and the fallback), badges, collapse and old Reddit comments; the popup's options applying live; banned subreddits across every listing unit and the ban screen; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
+Reddit's stamp, blurred thumbnail and media, and thumbnail click; comment callouts (unit), and
+comment spoilers (against `tests/fixtures/mock-spoiler.js` and the fallback), badges, collapse and
+old Reddit comments with its own spoiler; the popup's options applying live; banned subreddits across every listing unit and the ban screen; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
 end to end, including the cache being cleared (about 30 s, since it waits on the worker's
 reconnect alarm). Setting `RAB_EXT=<dir>` runs the tests against another copy of the extension; `RAB_EXT=$PWD/dist/build npx playwright test --grep-invert "hot reload"` checks the store build.
 

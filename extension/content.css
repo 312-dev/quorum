@@ -1,7 +1,7 @@
-/* Fallback blur for pages without Reddit's <shreddit-blurred-container> (old
-   Reddit). Values are the component's computed styles as measured on
-   www.reddit.com on 2026-10-23: 40px blur over an rgba(0,0,0,.8) fill, a .6
-   scrim, 16px corners, and the "media" pill button. */
+/* Fallback blur for New Reddit pages without its <shreddit-blurred-container>.
+   Values are the component's computed styles as measured on www.reddit.com on
+   2026-10-23: 40px blur over an rgba(0,0,0,.8) fill, a .6 scrim, 16px
+   corners, and the "media" pill button. */
 .rab-flagged {
   position: relative !important;
   overflow: hidden !important;
@@ -37,8 +37,58 @@
   cursor: pointer;
 }
 
-/* Fallback spoiler for comments where Reddit's <shreddit-spoiler> is missing
-   (old Reddit). Same structure and values as the component's shadow styles,
+/* Old Reddit has no blur, so this one is made of its parts (content.js
+   blurOld): its .stamp, here periwinkle, in the button row; the thumbnail
+   blurred, sprite icons included, so a blurred thumbnail always means
+   flagged; and the opened media or text blurred under a stamp-styled label in
+   old Reddit's 10px Verdana. */
+.rab-stamp {
+  color: #5b62c9;
+}
+
+.rab-old-flagged > a.thumbnail {
+  overflow: hidden;
+}
+
+.rab-old-flagged > a.thumbnail > img {
+  filter: blur(6px);
+  transform: scale(1.15);
+}
+
+.rab-old-flagged > a.thumbnail:not(:has(img)) {
+  filter: blur(3px);
+}
+
+.rab-old-flagged > .entry .expando {
+  position: relative;
+  overflow: hidden;
+  min-height: 60px;
+  cursor: pointer;
+}
+
+.rab-old-flagged > .entry .expando > * {
+  filter: blur(24px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.rab-old-flagged > .entry .expando::after {
+  content: "POTENTIAL AI \00b7  click to show";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2px 8px;
+  border: 1px solid #5b62c9;
+  border-radius: 3px;
+  background: #fff;
+  color: #5b62c9;
+  font: bold 10px/16px verdana, arial, helvetica, sans-serif;
+  white-space: nowrap;
+}
+
+/* Fallback spoiler for New Reddit comments where its <shreddit-spoiler> is
+   missing. Same structure and values as the component's shadow styles,
    measured on www.reddit.com on 2026-10-24: a #131313 bar with 2px corners
    over invisible text, fading to clear over 1s when revealed. */
 .rab-spoiler {
