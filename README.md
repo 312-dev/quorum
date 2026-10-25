@@ -1,6 +1,6 @@
-# Reddit AI Blur
+# Quorum for Reddit
 
-Chrome extension (MV3) that blurs Reddit posts whose comments call them out as AI or as bot /
+Community-verified AI and bot filter. A Chrome extension (MV3) that blurs Reddit posts whose comments call them out as AI or as bot /
 karma-farming posts, using Reddit's own NSFW blur with the button relabelled `Potential AI`. Click it to reveal the post. Works in feeds
 and on a post's own page. On a comments page it also hides comments that replies call out as
 AI-written, behind Reddit's spoiler bar with a `Potential AI` badge beside the author. r/isthisAI is
@@ -16,7 +16,8 @@ a good place to try it.
 
 ## Options
 
-Click the toolbar icon. Changes apply at once in every open Reddit tab and sync with your Chrome
+Click the toolbar icon. On/off options are vote switches (upvote for on, downvote for off), and the
+rule under the name tallies the cached posts: flagged in orange, clean in periwinkle. Changes apply at once in every open Reddit tab and sync with your Chrome
 profile (`chrome.storage.sync`, defaults in `extension/settings.js`):
 
 | Option | Default | |
@@ -97,12 +98,28 @@ closed, the toggle Reddit's own collapse button flips, so the badge stays visibl
 row. Old Reddit gets its native `.flair` for the badge and a spoiler bar drawn by `content.css` with
 the component's measured values (`#131313`, 2px corners).
 
+## Design
+
+The panel follows "Split Vote", a small design language taken from the icon, written up at the top
+of `extension/popup.css`: upvote orange means on, downvote periwinkle means off and marks AI, one
+2.5px stroke weight, a 3px gap where one shape sits on another, and numbers in mono. Its fonts
+(Unbounded, Instrument Sans, JetBrains Mono, Latin subset) ship in `extension/fonts/` with their
+SIL Open Font Licences, so opening the panel makes no network request.
+
 ## Icon
 
 `extension/icons/icon.svg` is the source: a question mark in Reddit's two vote colours, the
 orange half curling up into an upvote, the periwinkle half running down into a downvote, with the
 AI sparkle as its dot. `node dev/export-icons.mjs` renders the 16, 32, 48 and 128 px PNGs the
 manifest uses (the 128 px one with the 16 px padding the Chrome Web Store asks for).
+
+## Publishing
+
+`npm run package` writes `dist/quorum-<version>.zip`, the Chrome Web Store upload: `extension/`
+without the dev hot reload (the `dev:start`/`dev:end` block in `background.js`) and without the
+`alarms` permission only that block uses. `store/listing.md` holds every listing and privacy field
+ready to paste, `store/*.png` the screenshots and promo images, and `PRIVACY.md` the privacy
+policy the listing links to. Bump the manifest `version` for every upload.
 
 ## Tests
 
@@ -121,7 +138,7 @@ own page; the fallback overlay; click to reveal; caching across reloads, tabs an
 Reddit; comment callouts (unit), and comment spoilers (against `tests/fixtures/mock-spoiler.js`
 and the fallback), badges, collapse and old Reddit comments; the popup's options applying live; the JSON-to-partial fallback, including deferred comments; hidden scores; and hot reload
 end to end, including the cache being cleared (about 30 s, since it waits on the worker's
-reconnect alarm). Setting `RAB_EXT=<dir>` runs the tests against another copy of the extension.
+reconnect alarm). Setting `RAB_EXT=<dir>` runs the tests against another copy of the extension; `RAB_EXT=$PWD/dist/build npx playwright test --grep-invert "hot reload"` checks the store build.
 
 Two environment details the tests handle, in case you drive Chromium yourself:
 
