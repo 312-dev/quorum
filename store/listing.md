@@ -1,5 +1,10 @@
 # Chrome Web Store listing
 
+Submitted 2026-10-24 as item `aodlcenmoieibegbgdcjhaefbibddahc` under publisher **312.dev LLC**
+(trader account, verified through the 312.DEV LLC payments profile; contact `ope@312.dev`),
+version 0.3.0, set to publish automatically once review passes. Category: Social Networking.
+Dashboard: https://chrome.google.com/webstore/devconsole/b87e7ec3-6107-4af9-a622-8c6b7a7ce61b/aodlcenmoieibegbgdcjhaefbibddahc/edit
+
 Everything the developer dashboard asks for, ready to paste. Build the upload with
 `npm run package` (writes `dist/quorum-<version>.zip`); images are in this folder.
 
@@ -45,7 +50,7 @@ Everything the developer dashboard asks for, ready to paste. Build the upload wi
 
     Quorum is an independent project, not made by or affiliated with Reddit.
 
-**Category:** Social & Communication (or the closest social category the dashboard offers)
+**Category:** Social Networking
 
 **Language:** English
 
